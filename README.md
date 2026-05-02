@@ -21,8 +21,11 @@ El frontend corre en `http://localhost:5173` y el backend en `http://localhost:3
 ## Estructura
 
 ```text
-client/  React app
-server/  Express API
+client/               React app
+client/src/api/       Cliente HTTP para consumir Express
+client/src/views/     Pantallas principales
+client/src/components Componentes reutilizables
+server/               Express API
 ```
 
 ## Funcionalidades iniciales
@@ -36,6 +39,19 @@ server/  Express API
 - ABM de empleados con alta, modificacion y baja.
 - Liquidacion de sueldos e historial de cobro.
 - Calculo de variable sugerido sobre honorarios cobrados.
+- Frontend modularizado por capas y consumiendo datos desde `/api`.
+
+## Configuracion frontend
+
+Por defecto el frontend usa rutas relativas `/api/...` y Vite las proxyea al backend:
+
+```js
+proxy: {
+  '/api': 'http://localhost:3001',
+}
+```
+
+Si se necesita apuntar a otra URL, se puede definir `VITE_API_URL` en el entorno del frontend.
 
 ## Endpoints base
 

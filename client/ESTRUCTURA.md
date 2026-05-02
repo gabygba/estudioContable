@@ -16,11 +16,34 @@ client/
 │   └── Configura Vite, React y el proxy hacia el backend
 │
 └── src/
+    ├── api/
+    │   └── accountingApi.js
+    │       └── Cliente HTTP para consumir el backend Node
+    │
+    ├── components/
+    │   ├── MetricCard.jsx
+    │   └── Sidebar.jsx
+    │
+    ├── constants/
+    │   └── forms.js
+    │       └── Estados iniciales y opciones compartidas
+    │
+    ├── utils/
+    │   └── formatters.js
+    │       └── Formateo de moneda y helpers de nombres
+    │
+    ├── views/
+    │   ├── DashboardView.jsx
+    │   ├── ClientsView.jsx
+    │   ├── PaymentsView.jsx
+    │   ├── ReportsView.jsx
+    │   └── EmployeesView.jsx
+    │
     ├── main.jsx
     │   └── Punto de entrada: renderiza <App /> dentro de #root
     │
     ├── App.jsx
-    │   └── Pantallas, estado, datos mock y logica principal
+    │   └── Orquesta estado, navegacion y llamadas al backend
     │
     └── styles.css
         └── Estilos globales y estilos de cada vista
@@ -41,11 +64,9 @@ index.html
    │ importa:
    ├──────────────► App.jsx
    │                  │
-   │                  ├─ Home / Dashboard
-   │                  ├─ Clientes y conceptos
-   │                  ├─ Pagos
-   │                  ├─ Reportes
-   │                  └─ Empleados y sueldos
+   │                  ├─ api/accountingApi.js
+   │                  ├─ components/Sidebar.jsx
+   │                  └─ views/*
    │
    └──────────────► styles.css
                       │
@@ -85,37 +106,61 @@ Hace tres cosas:
 
 ### `src/App.jsx`
 
-Es el archivo principal de la aplicacion por ahora.
+Es el coordinador principal de la aplicacion.
 
 Contiene:
 
 ```text
-Datos mock iniciales
-   ├─ Clientes
-   ├─ Conceptos por defecto
-   ├─ Debitos/cargos
-   ├─ Pagos
-   ├─ Empleados
-   └─ Historial de sueldos
-
 Estado con useState
    ├─ Pantalla activa
+   ├─ Datos recibidos del backend
    ├─ Formularios
    ├─ Cliente seleccionado
-   └─ Datos cargados en memoria
+   ├─ Empleado seleccionado
+   └─ Estados de carga/error
 
 Calculos con useMemo
-   ├─ Saldos
-   ├─ Cobros
-   ├─ Reporte por cliente
-   └─ Variable de sueldos
+   └─ Honorarios cobrados para variable de sueldos
 
-Componentes de vista
-   ├─ DashboardView
-   ├─ ClientsView
-   ├─ PaymentsView
-   ├─ ReportsView
-   └─ EmployeesView
+Funciones async
+   ├─ Cargar dashboard/clientes/pagos/etc
+   ├─ Crear/editar/eliminar clientes
+   ├─ Crear conceptos y debitos
+   ├─ Registrar pagos
+   ├─ Crear/editar/eliminar empleados
+   └─ Registrar sueldos
+```
+
+### `src/api/accountingApi.js`
+
+Centraliza todas las llamadas HTTP.
+
+```text
+Frontend
+   │
+   ▼
+accountingApi
+   │
+   ├─ GET /api/clients
+   ├─ POST /api/clients
+   ├─ PUT /api/clients/:id
+   ├─ DELETE /api/clients/:id
+   ├─ POST /api/payments
+   └─ ...
+```
+
+Las vistas no llaman a `fetch` directamente. Eso mantiene la UI desacoplada del transporte HTTP.
+
+### `src/views/*`
+
+Cada archivo representa una pantalla.
+
+```text
+DashboardView   resumen y ultimos movimientos
+ClientsView     ABM de clientes y conceptos
+PaymentsView    registro e historial de pagos
+ReportsView     reporte imprimible por cliente
+EmployeesView   ABM de empleados y sueldos
 ```
 
 ### `src/styles.css`
@@ -167,8 +212,8 @@ Eso permite que el frontend pueda pedir datos a `/api/...` y Vite lo redirija al
 ```text
 App.jsx
 │
-├─ Tiene los datos
-├─ Tiene las funciones que modifican los datos
+├─ Carga los datos desde el backend
+├─ Tiene las funciones async que modifican los datos
 ├─ Decide que pantalla mostrar
 └─ Pasa datos y funciones a cada vista
 ```
@@ -189,25 +234,30 @@ Cuando se envia el formulario:
 handleRegisterPayment()
    │
    ▼
-Agrega el pago al estado payments
+POST /api/payments
    │
    ▼
-La pantalla se vuelve a renderizar con el nuevo pago
+App.jsx vuelve a cargar datos desde el backend
+   │
+   ▼
+La pantalla se renderiza con la respuesta actualizada
 ```
 
-## Proximo orden recomendado
+## Organizacion actual
 
-Cuando la app crezca, conviene separar `App.jsx` asi:
+La app ya esta separada en capas:
 
 ```text
 src/
-├── data/
-│   └── mockData.js
+├── api/
+│   └── accountingApi.js
 │
 ├── components/
 │   ├── Sidebar.jsx
 │   ├── MetricCard.jsx
-│   └── Panel.jsx
+│
+├── constants/
+│   └── forms.js
 │
 ├── views/
 │   ├── DashboardView.jsx
@@ -222,5 +272,3 @@ src/
 ├── App.jsx
 └── main.jsx
 ```
-
-Por ahora esta todo junto en `App.jsx` porque el prototipo todavia esta en etapa inicial.

@@ -113,6 +113,11 @@ function createId(collection) {
   return collection.length ? Math.max(...collection.map((item) => item.id)) + 1 : 1;
 }
 
+function createConceptId() {
+  const concepts = clients.flatMap((client) => client.defaultConcepts);
+  return createId(concepts);
+}
+
 function getDashboard() {
   const totalCharges = charges.reduce((total, charge) => total + charge.amount, 0);
   const totalPayments = payments.reduce((total, payment) => total + payment.amount, 0);
@@ -218,8 +223,15 @@ app.delete('/api/clients/:clientId', (req, res) => {
 
 app.post('/api/clients/:clientId/concepts', (req, res) => {
   const clientId = Number(req.params.clientId);
+  const client = clients.find((item) => item.id === clientId);
+
+  if (!client) {
+    res.status(404).json({ message: 'Cliente no encontrado' });
+    return;
+  }
+
   const concept = {
-    id: Date.now(),
+    id: createConceptId(),
     concept: req.body.concept,
     amount: Number(req.body.amount),
     dueDay: Number(req.body.dueDay),
@@ -237,6 +249,11 @@ app.patch('/api/clients/:clientId/concepts/:conceptId', (req, res) => {
   const clientId = Number(req.params.clientId);
   const conceptId = Number(req.params.conceptId);
   let updatedConcept;
+  const patch = {
+    ...req.body,
+    ...(req.body.amount === undefined ? {} : { amount: Number(req.body.amount) }),
+    ...(req.body.dueDay === undefined ? {} : { dueDay: Number(req.body.dueDay) }),
+  };
 
   clients = clients.map((client) => {
     if (client.id !== clientId) return client;
@@ -245,11 +262,16 @@ app.patch('/api/clients/:clientId/concepts/:conceptId', (req, res) => {
       ...client,
       defaultConcepts: client.defaultConcepts.map((concept) => {
         if (concept.id !== conceptId) return concept;
-        updatedConcept = { ...concept, ...req.body };
+        updatedConcept = { ...concept, ...patch };
         return updatedConcept;
       }),
     };
   });
+
+  if (!updatedConcept) {
+    res.status(404).json({ message: 'Concepto no encontrado' });
+    return;
+  }
 
   res.json(updatedConcept);
 });
@@ -292,6 +314,13 @@ app.post('/api/payments', (req, res) => {
 
 app.get('/api/reports/client/:clientId', (req, res) => {
   const clientId = Number(req.params.clientId);
+  const client = clients.find((item) => item.id === clientId);
+
+  if (!client) {
+    res.status(404).json({ message: 'Cliente no encontrado' });
+    return;
+  }
+
   const rows = [
     ...charges
       .filter((charge) => charge.clientId === clientId)
@@ -302,7 +331,7 @@ app.get('/api/reports/client/:clientId', (req, res) => {
   ].sort((a, b) => a.date.localeCompare(b.date));
 
   res.json({
-    client: clients.find((client) => client.id === clientId),
+    client,
     rows,
     balance: rows.reduce((total, row) => total + row.debit - row.credit, 0),
   });

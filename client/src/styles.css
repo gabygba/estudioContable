@@ -28,6 +28,12 @@ button {
   cursor: pointer;
 }
 
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -304,6 +310,17 @@ h2 {
 
 .full-panel {
   margin-top: 16px;
+}
+
+.status-panel {
+  margin-bottom: 16px;
+  color: #52606a;
+}
+
+.error-panel {
+  border-color: #f2b8b5;
+  background: #fff3f2;
+  color: #9f1d1d;
 }
 
 .wide-panel {
