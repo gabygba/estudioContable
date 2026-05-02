@@ -4,12 +4,15 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
+  Pencil,
   FileText,
   Plus,
   Printer,
   ReceiptText,
   Save,
   Search,
+  Trash2,
+  X,
   Users,
 } from 'lucide-react';
 
@@ -24,6 +27,8 @@ const initialClients = [
     id: 1,
     name: 'Alvarez & Asociados',
     cuit: '30-71234567-8',
+    email: 'administracion@alvarez.com',
+    phone: '11 4321-8000',
     defaultConcepts: [
       { id: 1, concept: 'Honorarios', amount: 85000, dueDay: 10, active: true },
       { id: 2, concept: 'Pago de IVA', amount: 126000, dueDay: 20, active: true },
@@ -34,6 +39,8 @@ const initialClients = [
     id: 2,
     name: 'Ferreteria Norte',
     cuit: '20-18654321-5',
+    email: 'pagos@ferreterianorte.com',
+    phone: '11 4555-9012',
     defaultConcepts: [
       { id: 4, concept: 'Honorarios', amount: 62000, dueDay: 10, active: true },
       { id: 5, concept: 'Monotributo', amount: 42000, dueDay: 20, active: true },
@@ -43,6 +50,8 @@ const initialClients = [
     id: 3,
     name: 'Clinica San Martin',
     cuit: '30-69876543-1',
+    email: 'contable@clinicasm.com',
+    phone: '11 4789-2200',
     defaultConcepts: [
       { id: 6, concept: 'Honorarios', amount: 126000, dueDay: 10, active: true },
       { id: 7, concept: 'Liquidacion de sueldos', amount: 96000, dueDay: 15, active: true },
@@ -81,8 +90,22 @@ const initialPayments = [
 ];
 
 const initialEmployees = [
-  { id: 1, name: 'Mariana Lopez', role: 'Administracion', commissionRate: 0.08 },
-  { id: 2, name: 'Santiago Ruiz', role: 'Contador junior', commissionRate: 0.12 },
+  {
+    id: 1,
+    name: 'Mariana Lopez',
+    role: 'Administracion',
+    commissionRate: 0.08,
+    email: 'mariana@estudio.local',
+    phone: '11 4020-1001',
+  },
+  {
+    id: 2,
+    name: 'Santiago Ruiz',
+    role: 'Contador junior',
+    commissionRate: 0.12,
+    email: 'santiago@estudio.local',
+    phone: '11 4020-1002',
+  },
 ];
 
 const initialSalaryHistory = [
@@ -101,6 +124,8 @@ const initialSalaryHistory = [
 ];
 
 const paymentMethods = ['Transferencia', 'Efectivo', 'Cheque', 'Mercado Pago'];
+const emptyClientForm = { name: '', cuit: '', email: '', phone: '' };
+const emptyEmployeeForm = { name: '', role: '', commissionRate: '10' };
 
 function formatCurrency(value) {
   return currencyFormatter.format(value);
@@ -119,6 +144,8 @@ function App() {
   const [salaryHistory, setSalaryHistory] = useState(initialSalaryHistory);
   const [selectedClientId, setSelectedClientId] = useState(initialClients[0].id);
   const [reportClientId, setReportClientId] = useState(initialClients[0].id);
+  const [clientForm, setClientForm] = useState(emptyClientForm);
+  const [editingClientId, setEditingClientId] = useState(null);
   const [conceptForm, setConceptForm] = useState({ concept: '', amount: '', dueDay: '10' });
   const [paymentForm, setPaymentForm] = useState({
     clientId: initialClients[0].id,
@@ -128,7 +155,8 @@ function App() {
     method: 'Transferencia',
     receipt: '',
   });
-  const [employeeForm, setEmployeeForm] = useState({ name: '', role: '', commissionRate: '10' });
+  const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm);
+  const [editingEmployeeId, setEditingEmployeeId] = useState(null);
   const [salaryForm, setSalaryForm] = useState({
     employeeId: initialEmployees[0].id,
     month: '2026-04',
@@ -139,7 +167,7 @@ function App() {
     notes: '',
   });
 
-  const selectedClient = clients.find((client) => client.id === Number(selectedClientId)) ?? clients[0];
+  const selectedClient = clients.find((client) => client.id === Number(selectedClientId)) ?? clients[0] ?? null;
 
   const honorariosCollected = useMemo(
     () =>
@@ -189,6 +217,69 @@ function App() {
 
   const reportBalance = reportRows.reduce((total, row) => total + row.debit - row.credit, 0);
 
+  function resetClientForm() {
+    setClientForm(emptyClientForm);
+    setEditingClientId(null);
+  }
+
+  function handleSaveClient(event) {
+    event.preventDefault();
+
+    const name = clientForm.name.trim();
+    const cuit = clientForm.cuit.trim();
+    const email = clientForm.email.trim();
+    const phone = clientForm.phone.trim();
+
+    if (!name || !cuit) return;
+
+    if (editingClientId) {
+      setClients((currentClients) =>
+        currentClients.map((client) =>
+          client.id === editingClientId ? { ...client, name, cuit, email, phone } : client,
+        ),
+      );
+      resetClientForm();
+      return;
+    }
+
+    const client = { id: Date.now(), name, cuit, email, phone, defaultConcepts: [] };
+    setClients((currentClients) => [...currentClients, client]);
+    setSelectedClientId(client.id);
+    setReportClientId(client.id);
+    setPaymentForm((currentForm) => ({ ...currentForm, clientId: client.id, concept: 'Honorarios' }));
+    resetClientForm();
+  }
+
+  function handleEditClient(client) {
+    setEditingClientId(client.id);
+    setClientForm({
+      name: client.name,
+      cuit: client.cuit,
+      email: client.email ?? '',
+      phone: client.phone ?? '',
+    });
+  }
+
+  function handleDeleteClient(clientId) {
+    const remainingClients = clients.filter((client) => client.id !== clientId);
+    const nextClientId = remainingClients[0]?.id ?? '';
+
+    setClients(remainingClients);
+    setCharges((currentCharges) => currentCharges.filter((charge) => charge.clientId !== clientId));
+    setPayments((currentPayments) => currentPayments.filter((payment) => payment.clientId !== clientId));
+    setSelectedClientId(nextClientId);
+    setReportClientId(nextClientId);
+    setPaymentForm((currentForm) => ({
+      ...currentForm,
+      clientId: nextClientId,
+      concept: remainingClients[0]?.defaultConcepts[0]?.concept ?? 'Honorarios',
+    }));
+
+    if (editingClientId === clientId) {
+      resetClientForm();
+    }
+  }
+
   function handleAddConcept(event) {
     event.preventDefault();
 
@@ -196,7 +287,7 @@ function App() {
     const amount = Number(conceptForm.amount);
     const dueDay = Number(conceptForm.dueDay);
 
-    if (!concept || !amount || !dueDay) return;
+    if (!selectedClient || !concept || !amount || !dueDay) return;
 
     setClients((currentClients) =>
       currentClients.map((client) =>
@@ -215,6 +306,8 @@ function App() {
   }
 
   function handleConceptAmountChange(conceptId, amount) {
+    if (!selectedClient) return;
+
     setClients((currentClients) =>
       currentClients.map((client) =>
         client.id === selectedClient.id
@@ -230,6 +323,8 @@ function App() {
   }
 
   function handleToggleConcept(conceptId) {
+    if (!selectedClient) return;
+
     setClients((currentClients) =>
       currentClients.map((client) =>
         client.id === selectedClient.id
@@ -245,6 +340,8 @@ function App() {
   }
 
   function handleCreateCharge(concept) {
+    if (!selectedClient) return;
+
     setCharges((currentCharges) => [
       ...currentCharges,
       {
@@ -261,7 +358,7 @@ function App() {
     event.preventDefault();
 
     const amount = Number(paymentForm.amount);
-    if (!amount) return;
+    if (!paymentForm.clientId || !amount) return;
 
     setPayments((currentPayments) => [
       ...currentPayments,
@@ -284,14 +381,58 @@ function App() {
 
     const name = employeeForm.name.trim();
     const role = employeeForm.role.trim();
+    const email = employeeForm.email?.trim() ?? '';
+    const phone = employeeForm.phone?.trim() ?? '';
     const commissionRate = Number(employeeForm.commissionRate) / 100;
 
     if (!name || !role || Number.isNaN(commissionRate)) return;
 
-    const employee = { id: Date.now(), name, role, commissionRate };
+    if (editingEmployeeId) {
+      setEmployees((currentEmployees) =>
+        currentEmployees.map((employee) =>
+          employee.id === editingEmployeeId ? { ...employee, name, role, email, phone, commissionRate } : employee,
+        ),
+      );
+      setEmployeeForm(emptyEmployeeForm);
+      setEditingEmployeeId(null);
+      return;
+    }
+
+    const employee = { id: Date.now(), name, role, email, phone, commissionRate };
     setEmployees((currentEmployees) => [...currentEmployees, employee]);
     setSalaryForm((currentForm) => ({ ...currentForm, employeeId: employee.id }));
-    setEmployeeForm({ name: '', role: '', commissionRate: '10' });
+    setEmployeeForm(emptyEmployeeForm);
+  }
+
+  function handleEditEmployee(employee) {
+    setEditingEmployeeId(employee.id);
+    setEmployeeForm({
+      name: employee.name,
+      role: employee.role,
+      email: employee.email ?? '',
+      phone: employee.phone ?? '',
+      commissionRate: String(Math.round(employee.commissionRate * 100)),
+    });
+  }
+
+  function handleCancelEmployeeEdit() {
+    setEditingEmployeeId(null);
+    setEmployeeForm(emptyEmployeeForm);
+  }
+
+  function handleDeleteEmployee(employeeId) {
+    const remainingEmployees = employees.filter((employee) => employee.id !== employeeId);
+
+    setEmployees(remainingEmployees);
+    setSalaryHistory((currentHistory) => currentHistory.filter((salary) => salary.employeeId !== employeeId));
+    setSalaryForm((currentForm) => ({
+      ...currentForm,
+      employeeId: remainingEmployees[0]?.id ?? '',
+    }));
+
+    if (editingEmployeeId === employeeId) {
+      handleCancelEmployeeEdit();
+    }
   }
 
   function handleRegisterSalary(event) {
@@ -376,14 +517,21 @@ function App() {
 
         {activeSection === 'clients' && (
           <ClientsView
+            clientForm={clientForm}
             clients={clients}
             conceptForm={conceptForm}
             handleAddConcept={handleAddConcept}
             handleConceptAmountChange={handleConceptAmountChange}
             handleCreateCharge={handleCreateCharge}
+            handleDeleteClient={handleDeleteClient}
+            handleEditClient={handleEditClient}
+            handleSaveClient={handleSaveClient}
             handleToggleConcept={handleToggleConcept}
+            editingClientId={editingClientId}
+            resetClientForm={resetClientForm}
             selectedClient={selectedClient}
             selectedClientId={selectedClientId}
+            setClientForm={setClientForm}
             setConceptForm={setConceptForm}
             setSelectedClientId={setSelectedClientId}
           />
@@ -415,8 +563,12 @@ function App() {
             employeeForm={employeeForm}
             employees={employees}
             handleAddEmployee={handleAddEmployee}
+            handleCancelEmployeeEdit={handleCancelEmployeeEdit}
+            handleDeleteEmployee={handleDeleteEmployee}
+            handleEditEmployee={handleEditEmployee}
             handleRegisterSalary={handleRegisterSalary}
             honorariosCollected={honorariosCollected}
+            editingEmployeeId={editingEmployeeId}
             paymentMethods={paymentMethods}
             salaryForm={salaryForm}
             salaryHistory={salaryHistory}
@@ -541,30 +693,130 @@ function DashboardView({ clients, dashboard, payments, charges, setActiveSection
 }
 
 function ClientsView({
+  clientForm,
   clients,
   conceptForm,
+  editingClientId,
   handleAddConcept,
   handleConceptAmountChange,
   handleCreateCharge,
+  handleDeleteClient,
+  handleEditClient,
+  handleSaveClient,
   handleToggleConcept,
+  resetClientForm,
   selectedClient,
   selectedClientId,
+  setClientForm,
   setConceptForm,
   setSelectedClientId,
 }) {
+  const hasClients = clients.length > 0;
+
   return (
     <>
       <header className="topbar">
         <div>
           <p className="eyebrow">Clientes</p>
-          <h1>Conceptos e importes por defecto</h1>
+          <h1>ABM de clientes y conceptos</h1>
         </div>
       </header>
+
+      <section className="content-grid">
+        <form className="panel form-panel" onSubmit={handleSaveClient}>
+          <p className="eyebrow">{editingClientId ? 'Editar cliente' : 'Alta de cliente'}</p>
+          <h2>{editingClientId ? 'Modificar datos del cliente' : 'Registrar cliente'}</h2>
+          <div className="form-grid">
+            <label className="field">
+              Razon social / nombre
+              <input
+                onChange={(event) => setClientForm({ ...clientForm, name: event.target.value })}
+                placeholder="Ej. Alvarez & Asociados"
+                value={clientForm.name}
+              />
+            </label>
+            <label className="field">
+              CUIT
+              <input
+                onChange={(event) => setClientForm({ ...clientForm, cuit: event.target.value })}
+                placeholder="30-00000000-0"
+                value={clientForm.cuit}
+              />
+            </label>
+          </div>
+          <div className="form-grid">
+            <label className="field">
+              Email
+              <input
+                onChange={(event) => setClientForm({ ...clientForm, email: event.target.value })}
+                placeholder="administracion@cliente.com"
+                type="email"
+                value={clientForm.email}
+              />
+            </label>
+            <label className="field">
+              Telefono
+              <input
+                onChange={(event) => setClientForm({ ...clientForm, phone: event.target.value })}
+                placeholder="11 4000-0000"
+                value={clientForm.phone}
+              />
+            </label>
+          </div>
+          <div className="button-row">
+            <button className="primary-button" type="submit">
+              <Save size={18} />
+              {editingClientId ? 'Guardar cambios' : 'Agregar cliente'}
+            </button>
+            {editingClientId && (
+              <button className="ghost-button" onClick={resetClientForm} type="button">
+                <X size={18} />
+                Cancelar
+              </button>
+            )}
+          </div>
+        </form>
+
+        <article className="panel wide-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Listado</p>
+              <h2>Clientes registrados</h2>
+            </div>
+          </div>
+          <div className="table-list">
+            {clients.map((client) => (
+              <div className="table-row abm-row" key={client.id}>
+                <div>
+                  <strong>{client.name}</strong>
+                  <span>
+                    {client.cuit} {client.email ? `- ${client.email}` : ''}
+                  </span>
+                </div>
+                <span>{client.phone || 'Sin telefono'}</span>
+                <div className="row-actions">
+                  <button className="icon-button" onClick={() => handleEditClient(client)} type="button" aria-label={`Editar ${client.name}`}>
+                    <Pencil size={17} />
+                  </button>
+                  <button className="icon-button danger" onClick={() => handleDeleteClient(client.id)} type="button" aria-label={`Eliminar ${client.name}`}>
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!hasClients && <p className="empty-state">Todavia no hay clientes cargados.</p>}
+          </div>
+        </article>
+      </section>
 
       <div className="toolbar">
         <label className="field compact">
           Cliente
-          <select value={selectedClientId} onChange={(event) => setSelectedClientId(Number(event.target.value))}>
+          <select
+            disabled={!hasClients}
+            value={selectedClientId}
+            onChange={(event) => setSelectedClientId(Number(event.target.value))}
+          >
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.name}
@@ -574,7 +826,7 @@ function ClientsView({
         </label>
         <div className="client-id">
           <span>CUIT</span>
-          <strong>{selectedClient.cuit}</strong>
+          <strong>{selectedClient?.cuit ?? '-'}</strong>
         </div>
       </div>
 
@@ -583,12 +835,12 @@ function ClientsView({
           <div className="panel-header">
             <div>
               <p className="eyebrow">Base de cobro</p>
-              <h2>{selectedClient.name}</h2>
+              <h2>{selectedClient?.name ?? 'Sin cliente seleccionado'}</h2>
             </div>
           </div>
 
           <div className="table-list">
-            {selectedClient.defaultConcepts.map((item) => (
+            {selectedClient?.defaultConcepts.map((item) => (
               <div className="table-row concept-row" key={item.id}>
                 <div>
                   <strong>{item.concept}</strong>
@@ -610,6 +862,9 @@ function ClientsView({
                 </button>
               </div>
             ))}
+            {selectedClient && selectedClient.defaultConcepts.length === 0 && (
+              <p className="empty-state">Este cliente todavia no tiene conceptos recurrentes.</p>
+            )}
           </div>
         </article>
 
@@ -655,7 +910,7 @@ function ClientsView({
 }
 
 function PaymentsView({ clients, handleRegisterPayment, paymentForm, paymentMethods, payments, setPaymentForm }) {
-  const selectedClient = clients.find((client) => client.id === Number(paymentForm.clientId)) ?? clients[0];
+  const selectedClient = clients.find((client) => client.id === Number(paymentForm.clientId)) ?? clients[0] ?? null;
 
   return (
     <>
@@ -673,6 +928,7 @@ function PaymentsView({ clients, handleRegisterPayment, paymentForm, paymentMeth
           <label className="field">
             Cliente
             <select
+              disabled={clients.length === 0}
               value={paymentForm.clientId}
               onChange={(event) =>
                 setPaymentForm({
@@ -697,11 +953,12 @@ function PaymentsView({ clients, handleRegisterPayment, paymentForm, paymentMeth
               value={paymentForm.concept}
               onChange={(event) => setPaymentForm({ ...paymentForm, concept: event.target.value })}
             >
-              {selectedClient.defaultConcepts.map((item) => (
+              {selectedClient?.defaultConcepts.map((item) => (
                 <option key={item.id} value={item.concept}>
                   {item.concept}
                 </option>
               ))}
+              {!selectedClient?.defaultConcepts.length && <option value="Honorarios">Honorarios</option>}
             </select>
           </label>
           <div className="form-grid">
@@ -841,9 +1098,13 @@ function ReportsView({ clients, reportBalance, reportClientId, reportRows, setRe
 }
 
 function EmployeesView({
+  editingEmployeeId,
   employeeForm,
   employees,
   handleAddEmployee,
+  handleCancelEmployeeEdit,
+  handleDeleteEmployee,
+  handleEditEmployee,
   handleRegisterSalary,
   honorariosCollected,
   paymentMethods,
@@ -852,8 +1113,8 @@ function EmployeesView({
   setEmployeeForm,
   setSalaryForm,
 }) {
-  const selectedEmployee = employees.find((employee) => employee.id === Number(salaryForm.employeeId)) ?? employees[0];
-  const suggestedVariable = Math.round(honorariosCollected * selectedEmployee.commissionRate);
+  const selectedEmployee = employees.find((employee) => employee.id === Number(salaryForm.employeeId)) ?? employees[0] ?? null;
+  const suggestedVariable = selectedEmployee ? Math.round(honorariosCollected * selectedEmployee.commissionRate) : 0;
 
   return (
     <>
@@ -866,8 +1127,8 @@ function EmployeesView({
 
       <section className="content-grid">
         <form className="panel form-panel" onSubmit={handleAddEmployee}>
-          <p className="eyebrow">Legajo</p>
-          <h2>Registrar empleado</h2>
+          <p className="eyebrow">{editingEmployeeId ? 'Editar empleado' : 'Alta de empleado'}</p>
+          <h2>{editingEmployeeId ? 'Modificar legajo' : 'Registrar empleado'}</h2>
           <label className="field">
             Nombre
             <input
@@ -884,6 +1145,25 @@ function EmployeesView({
               value={employeeForm.role}
             />
           </label>
+          <div className="form-grid">
+            <label className="field">
+              Email
+              <input
+                onChange={(event) => setEmployeeForm({ ...employeeForm, email: event.target.value })}
+                placeholder="empleado@estudio.com"
+                type="email"
+                value={employeeForm.email ?? ''}
+              />
+            </label>
+            <label className="field">
+              Telefono
+              <input
+                onChange={(event) => setEmployeeForm({ ...employeeForm, phone: event.target.value })}
+                placeholder="11 4000-0000"
+                value={employeeForm.phone ?? ''}
+              />
+            </label>
+          </div>
           <label className="field">
             Porcentaje sobre honorarios cobrados
             <input
@@ -893,10 +1173,18 @@ function EmployeesView({
               value={employeeForm.commissionRate}
             />
           </label>
-          <button className="primary-button" type="submit">
-            <Plus size={18} />
-            Agregar empleado
-          </button>
+          <div className="button-row">
+            <button className="primary-button" type="submit">
+              {editingEmployeeId ? <Save size={18} /> : <Plus size={18} />}
+              {editingEmployeeId ? 'Guardar cambios' : 'Agregar empleado'}
+            </button>
+            {editingEmployeeId && (
+              <button className="ghost-button" onClick={handleCancelEmployeeEdit} type="button">
+                <X size={18} />
+                Cancelar
+              </button>
+            )}
+          </div>
         </form>
 
         <form className="panel form-panel" onSubmit={handleRegisterSalary}>
@@ -905,6 +1193,7 @@ function EmployeesView({
           <label className="field">
             Empleado
             <select
+              disabled={employees.length === 0}
               value={salaryForm.employeeId}
               onChange={(event) => setSalaryForm({ ...salaryForm, employeeId: Number(event.target.value) })}
             >
@@ -978,6 +1267,37 @@ function EmployeesView({
             Registrar sueldo
           </button>
         </form>
+      </section>
+
+      <section className="panel full-panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">ABM</p>
+            <h2>Empleados registrados</h2>
+          </div>
+        </div>
+        <div className="table-list">
+          {employees.map((employee) => (
+            <div className="table-row abm-row" key={employee.id}>
+              <div>
+                <strong>{employee.name}</strong>
+                <span>
+                  {employee.role} - {Math.round(employee.commissionRate * 100)}% sobre honorarios
+                </span>
+              </div>
+              <span>{employee.email || employee.phone || 'Sin contacto'}</span>
+              <div className="row-actions">
+                <button className="icon-button" onClick={() => handleEditEmployee(employee)} type="button" aria-label={`Editar ${employee.name}`}>
+                  <Pencil size={17} />
+                </button>
+                <button className="icon-button danger" onClick={() => handleDeleteEmployee(employee.id)} type="button" aria-label={`Eliminar ${employee.name}`}>
+                  <Trash2 size={17} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {employees.length === 0 && <p className="empty-state">Todavia no hay empleados cargados.</p>}
+        </div>
       </section>
 
       <section className="panel full-panel">

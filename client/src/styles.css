@@ -182,6 +182,11 @@ h2 {
   color: #263640;
 }
 
+.icon-button.danger {
+  background: #fde8e8;
+  color: #9f1d1d;
+}
+
 .status-toggle {
   min-width: 86px;
   padding: 0 12px;
@@ -317,6 +322,21 @@ h2 {
   gap: 12px;
 }
 
+.button-row,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.button-row {
+  flex-wrap: wrap;
+}
+
+.row-actions {
+  justify-content: flex-end;
+}
+
 .movement-list,
 .table-list,
 .quick-actions {
@@ -374,8 +394,18 @@ h2 {
   grid-template-columns: minmax(220px, 1fr) 140px 140px;
 }
 
+.abm-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(160px, 0.5fr) 94px;
+}
+
 .amount-input {
   text-align: right;
+}
+
+.empty-state {
+  margin: 10px 0 0;
+  color: #64717a;
 }
 
 .action-panel {
@@ -495,6 +525,7 @@ h2 {
   }
 
   .concept-row,
+  .abm-row,
   .payment-row,
   .salary-row,
   .report-table-head,

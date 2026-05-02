@@ -28,17 +28,23 @@ server/  Express API
 ## Funcionalidades iniciales
 
 - Home con resumen de saldo pendiente, cobros registrados y conceptos activos.
+- ABM de clientes con alta, modificacion y baja.
 - Gestion de conceptos/importes por defecto por cliente.
 - Generacion manual de debitos desde conceptos recurrentes.
 - Registro de pagos discriminados por cliente, concepto y medio de pago.
 - Reporte imprimible por cliente con debitos, creditos y saldo.
-- Vista de empleados con alta simple, liquidacion de sueldos e historial.
+- ABM de empleados con alta, modificacion y baja.
+- Liquidacion de sueldos e historial de cobro.
 - Calculo de variable sugerido sobre honorarios cobrados.
 
 ## Endpoints base
 
 - `GET /api/dashboard`
 - `GET /api/clients`
+- `GET /api/clients/:clientId`
+- `POST /api/clients`
+- `PUT /api/clients/:clientId`
+- `DELETE /api/clients/:clientId`
 - `POST /api/clients/:clientId/concepts`
 - `PATCH /api/clients/:clientId/concepts/:conceptId`
 - `GET /api/charges`
@@ -47,6 +53,9 @@ server/  Express API
 - `POST /api/payments`
 - `GET /api/reports/client/:clientId`
 - `GET /api/employees`
+- `GET /api/employees/:employeeId`
 - `POST /api/employees`
+- `PUT /api/employees/:employeeId`
+- `DELETE /api/employees/:employeeId`
 - `GET /api/salaries`
 - `POST /api/salaries`
