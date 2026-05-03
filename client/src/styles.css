@@ -231,6 +231,22 @@ h2 {
   padding: 0 12px;
 }
 
+.readonly-field {
+  display: grid;
+  gap: 7px;
+  min-height: 64px;
+  padding: 12px;
+  border: 1px solid #d7e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.readonly-field span {
+  color: #52606a;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
 .field.compact {
   min-width: 280px;
 }
@@ -304,6 +320,20 @@ h2 {
   margin-top: 16px;
 }
 
+.content-grid:has(.detail-panel) {
+  grid-template-columns: minmax(300px, 0.5fr) minmax(0, 1fr) minmax(320px, 0.5fr);
+}
+
+.client-home-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.62fr);
+  margin-top: 28px;
+}
+
+.report-builder-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.5fr);
+  margin-top: 28px;
+}
+
 .panel {
   padding: 20px;
 }
@@ -331,6 +361,58 @@ h2 {
   align-self: start;
   display: grid;
   gap: 14px;
+}
+
+.client-form-page {
+  max-width: 980px;
+  margin-top: 28px;
+}
+
+.inline-form-panel {
+  margin-top: 18px;
+}
+
+.filter-block {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d7e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.compact-header {
+  min-height: auto;
+}
+
+.compact-button {
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.checkbox-grid.two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.check-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  color: #263640;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.check-option input {
+  width: 16px;
+  height: 16px;
 }
 
 .form-grid {
@@ -405,6 +487,27 @@ h2 {
   grid-template-columns: minmax(180px, 1fr) 150px 96px 150px;
 }
 
+.concept-detail-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 150px 120px 96px 150px;
+}
+
+.concept-detail-row input,
+.client-select-button {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #d7e0e4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17202a;
+  outline: 0;
+  padding: 0 12px;
+}
+
+.concept-detail-row input[type="number"] {
+  text-align: right;
+}
+
 .payment-row,
 .salary-row {
   display: grid;
@@ -414,6 +517,32 @@ h2 {
 .abm-row {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(160px, 0.5fr) 94px;
+}
+
+.client-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 12px;
+}
+
+.client-select-button {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 150px;
+  align-items: center;
+  gap: 16px;
+  min-height: 58px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.client-select-button:hover {
+  background: #f6f9fa;
+}
+
+.client-select-button div:last-child {
+  text-align: right;
 }
 
 .amount-input {
@@ -443,6 +572,81 @@ h2 {
 
 .salary-base strong {
   font-size: 1.1rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.report-summary-grid,
+.report-total-grid {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.report-summary-grid div,
+.report-total-grid div {
+  padding: 12px;
+  border: 1px solid #d7e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.report-summary-grid span,
+.report-total-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64717a;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.report-total-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.client-report-result {
+  margin-top: 16px;
+}
+
+.movement-report-head,
+.movement-report-row {
+  grid-template-columns: 110px minmax(180px, 1fr) minmax(180px, 1fr) 90px 120px 120px;
+}
+
+.movement-report-row span:nth-child(4) {
+  text-align: left;
+}
+
+.movement-report-row span:nth-child(5),
+.movement-report-row span:nth-child(6) {
+  text-align: right;
+}
+
+.detail-grid div {
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid #d7e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.detail-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64717a;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.detail-grid strong {
+  overflow-wrap: anywhere;
 }
 
 .report-sheet {
@@ -492,6 +696,92 @@ h2 {
   text-align: right;
 }
 
+/* Estilos para filas interactivas de pagos */
+.payment-row[type="button"] {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 140px 140px 24px;
+  gap: 10px;
+  align-items: center;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.payment-row[type="button"]:hover {
+  background: #f6f9fa;
+  border-radius: 4px;
+}
+
+.payment-row[type="button"].active {
+  background: #e8f4f8;
+  border-left: 3px solid #3fb984;
+  padding-left: 9px;
+}
+
+.payment-row .row-indicator {
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  color: #3fb984;
+}
+
+.payment-row[type="button"]:hover .row-indicator {
+  opacity: 1;
+}
+
+.payment-row.active .row-indicator {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+/* Panel de detalles */
+.detail-panel {
+  grid-column: 3;
+  overflow-y: auto;
+}
+
+.detail-panel-inline {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #edf1f3;
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf1f3;
+}
+
+.detail-row:last-child {
+  border-bottom: 0;
+}
+
+.detail-label {
+  color: #64717a;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.detail-value {
+  text-align: right;
+  color: #17202a;
+  font-size: 0.95rem;
+}
+
+.full-width-button {
+  width: 100%;
+}
+
 @media (max-width: 1050px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -510,7 +800,9 @@ h2 {
   }
 
   .metric-grid,
-  .content-grid {
+  .content-grid,
+  .client-home-grid,
+  .report-builder-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -542,6 +834,7 @@ h2 {
   }
 
   .concept-row,
+  .concept-detail-row,
   .abm-row,
   .payment-row,
   .salary-row,
@@ -557,6 +850,20 @@ h2 {
   .report-table-row {
     align-items: start;
     padding: 12px 0;
+  }
+
+  .client-list-row,
+  .client-select-button,
+  .detail-grid,
+  .checkbox-grid,
+  .report-total-grid,
+  .movement-report-head,
+  .movement-report-row {
+    grid-template-columns: 1fr;
+  }
+
+  .client-select-button div:last-child {
+    text-align: left;
   }
 }
 

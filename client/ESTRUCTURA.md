@@ -36,7 +36,6 @@ client/
     │   ├── DashboardView.jsx
     │   ├── ClientsView.jsx
     │   ├── PaymentsView.jsx
-    │   ├── ReportsView.jsx
     │   └── EmployeesView.jsx
     │
     ├── main.jsx
@@ -157,9 +156,8 @@ Cada archivo representa una pantalla.
 
 ```text
 DashboardView   resumen y ultimos movimientos
-ClientsView     ABM de clientes y conceptos
-PaymentsView    registro e historial de pagos
-ReportsView     reporte imprimible por cliente
+ClientsView     listado, alta, detalle, conceptos, pagos y reportes filtrados
+PaymentsView    formulario reutilizado dentro del detalle de cliente
 EmployeesView   ABM de empleados y sueldos
 ```
 
@@ -263,7 +261,6 @@ src/
 │   ├── DashboardView.jsx
 │   ├── ClientsView.jsx
 │   ├── PaymentsView.jsx
-│   ├── ReportsView.jsx
 │   └── EmployeesView.jsx
 │
 ├── utils/

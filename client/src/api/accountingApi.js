@@ -28,6 +28,24 @@ async function request(path, options = {}) {
   return data;
 }
 
+function buildQueryParams(params) {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (Array.isArray(value) && value.length > 0) {
+      searchParams.set(key, value.join(','));
+      return;
+    }
+
+    if (!Array.isArray(value) && value !== undefined && value !== null && value !== '') {
+      searchParams.set(key, value);
+    }
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+}
+
 export const accountingApi = {
   getDashboard: () => request('/api/dashboard'),
 
@@ -48,7 +66,7 @@ export const accountingApi = {
   getPayments: () => request('/api/payments'),
   createPayment: (payment) => request('/api/payments', { method: 'POST', body: payment }),
 
-  getClientReport: (clientId) => request(`/api/reports/client/${clientId}`),
+  getMovementsReport: (filters) => request(`/api/reports/movements${buildQueryParams(filters)}`),
 
   getEmployees: () => request('/api/employees'),
   getEmployee: (employeeId) => request(`/api/employees/${employeeId}`),

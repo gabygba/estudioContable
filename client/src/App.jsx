@@ -12,8 +12,6 @@ import {
 import { ClientsView } from './views/ClientsView.jsx';
 import { DashboardView } from './views/DashboardView.jsx';
 import { EmployeesView } from './views/EmployeesView.jsx';
-import { PaymentsView } from './views/PaymentsView.jsx';
-import { ReportsView } from './views/ReportsView.jsx';
 
 const emptyDashboard = {
   pendingBalance: 0,
@@ -38,9 +36,10 @@ function App() {
   const [employees, setEmployees] = useState([]);
   const [salaryHistory, setSalaryHistory] = useState([]);
   const [dashboard, setDashboard] = useState(emptyDashboard);
-  const [report, setReport] = useState(null);
+  const [clientReport, setClientReport] = useState(null);
+  const [isClientReportLoading, setIsClientReportLoading] = useState(false);
+  const [clientScreen, setClientScreen] = useState('list');
   const [selectedClientId, setSelectedClientId] = useState('');
-  const [reportClientId, setReportClientId] = useState('');
   const [clientForm, setClientForm] = useState(EMPTY_CLIENT_FORM);
   const [editingClientId, setEditingClientId] = useState(null);
   const [conceptForm, setConceptForm] = useState(EMPTY_CONCEPT_FORM);
@@ -80,7 +79,6 @@ function App() {
       setSalaryHistory(salariesData);
 
       setSelectedClientId((currentId) => pickExistingId(clientsData, currentId));
-      setReportClientId((currentId) => pickExistingId(clientsData, currentId));
       setPaymentForm((currentForm) => {
         const clientId = pickExistingId(clientsData, currentForm.clientId);
         const client = clientsData.find((item) => item.id === Number(clientId));
@@ -104,27 +102,9 @@ function App() {
     }
   }, []);
 
-  const loadClientReport = useCallback(async (clientId) => {
-    if (!clientId) {
-      setReport(null);
-      return;
-    }
-
-    try {
-      const reportData = await accountingApi.getClientReport(clientId);
-      setReport(reportData);
-    } catch (error) {
-      setErrorMessage(error.message);
-    }
-  }, []);
-
   useEffect(() => {
     loadApplicationData();
   }, [loadApplicationData]);
-
-  useEffect(() => {
-    loadClientReport(reportClientId);
-  }, [loadClientReport, reportClientId]);
 
   const selectedClient = clients.find((client) => client.id === Number(selectedClientId)) ?? clients[0] ?? null;
 
@@ -139,6 +119,64 @@ function App() {
   function resetClientForm() {
     setClientForm(EMPTY_CLIENT_FORM);
     setEditingClientId(null);
+  }
+
+  function handleStartNewClient() {
+    resetClientForm();
+    setClientScreen('new');
+  }
+
+  function handleCancelClientForm() {
+    resetClientForm();
+    setClientScreen('list');
+  }
+
+  function handleSelectClient(clientId) {
+    setSelectedClientId(clientId);
+    resetClientForm();
+    setConceptForm(EMPTY_CONCEPT_FORM);
+    setClientScreen('detail');
+  }
+
+  function handleShowClientsList() {
+    resetClientForm();
+    setConceptForm(EMPTY_CONCEPT_FORM);
+    setClientScreen('list');
+  }
+
+  function handleShowClientReport() {
+    resetClientForm();
+    setConceptForm(EMPTY_CONCEPT_FORM);
+    setClientReport(null);
+    setClientScreen('report');
+  }
+
+  function handleStartClientPayment(clientId) {
+    const client = clients.find((item) => item.id === Number(clientId));
+
+    setSelectedClientId(clientId);
+    setPaymentForm((currentForm) => ({
+      ...currentForm,
+      clientId,
+      concept: getFirstConcept(client),
+      amount: '',
+      receipt: '',
+    }));
+    setClientScreen('payment');
+  }
+
+  async function handleGenerateClientReport(filters) {
+    setIsClientReportLoading(true);
+    setErrorMessage('');
+
+    try {
+      const reportData = await accountingApi.getMovementsReport(filters);
+      setClientReport(reportData);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsClientReportLoading(false);
+    }
   }
 
   async function handleSaveClient(event) {
@@ -161,12 +199,12 @@ function App() {
       resetClientForm();
       await loadApplicationData();
       setSelectedClientId(savedClient.id);
-      setReportClientId(savedClient.id);
       setPaymentForm((currentForm) => ({
         ...currentForm,
         clientId: savedClient.id,
         concept: getFirstConcept(savedClient),
       }));
+      setClientScreen('detail');
     } catch (error) {
       setErrorMessage(error.message);
     }
@@ -180,6 +218,7 @@ function App() {
       email: client.email ?? '',
       phone: client.phone ?? '',
     });
+    setClientScreen('detail');
   }
 
   async function handleDeleteClient(clientId) {
@@ -189,7 +228,8 @@ function App() {
       await accountingApi.deleteClient(clientId);
       if (editingClientId === clientId) resetClientForm();
       await loadApplicationData();
-      setReport(null);
+      setClientScreen('list');
+      setClientReport(null);
     } catch (error) {
       setErrorMessage(error.message);
     }
@@ -216,10 +256,8 @@ function App() {
     }
   }
 
-  async function handleConceptAmountChange(conceptId, amount) {
+  function handleConceptFieldChange(conceptId, field, value) {
     if (!selectedClient) return;
-
-    const numericAmount = Number(amount);
 
     setClients((currentClients) =>
       currentClients.map((client) =>
@@ -227,15 +265,19 @@ function App() {
           ? {
               ...client,
               defaultConcepts: client.defaultConcepts.map((concept) =>
-                concept.id === conceptId ? { ...concept, amount: numericAmount } : concept,
+                concept.id === conceptId ? { ...concept, [field]: value } : concept,
               ),
             }
           : client,
       ),
     );
+  }
+
+  async function handleUpdateConcept(conceptId, patch) {
+    if (!selectedClient) return;
 
     try {
-      await accountingApi.updateConcept(selectedClient.id, conceptId, { amount: numericAmount });
+      await accountingApi.updateConcept(selectedClient.id, conceptId, patch);
       const dashboardData = await accountingApi.getDashboard();
       setDashboard(dashboardData);
     } catch (error) {
@@ -286,7 +328,6 @@ function App() {
         amount: concept.amount,
       });
       await loadApplicationData();
-      await loadClientReport(reportClientId);
     } catch (error) {
       setErrorMessage(error.message);
     }
@@ -310,7 +351,6 @@ function App() {
       await accountingApi.createPayment(payload);
       setPaymentForm((currentForm) => ({ ...currentForm, amount: '', receipt: '' }));
       await loadApplicationData();
-      await loadClientReport(reportClientId);
     } catch (error) {
       setErrorMessage(error.message);
     }
@@ -401,6 +441,14 @@ function App() {
     }
   }
 
+  function handleSectionChange(sectionId) {
+    setActiveSection(sectionId);
+    if (sectionId === 'clients') {
+      setClientScreen('list');
+      resetClientForm();
+    }
+  }
+
   function renderActiveView() {
     if (isLoading) {
       return <div className="panel status-panel">Cargando datos del backend...</div>;
@@ -413,7 +461,7 @@ function App() {
           clients={clients}
           dashboard={dashboard}
           payments={payments}
-          setActiveSection={setActiveSection}
+          setActiveSection={handleSectionChange}
         />
       );
     }
@@ -422,46 +470,37 @@ function App() {
       return (
         <ClientsView
           clientForm={clientForm}
+          clientReport={clientReport}
+          clientScreen={clientScreen}
           clients={clients}
           conceptForm={conceptForm}
+          charges={charges}
           editingClientId={editingClientId}
           handleAddConcept={handleAddConcept}
-          handleConceptAmountChange={handleConceptAmountChange}
+          handleCancelClientForm={handleCancelClientForm}
+          handleConceptFieldChange={handleConceptFieldChange}
           handleCreateCharge={handleCreateCharge}
           handleDeleteClient={handleDeleteClient}
           handleEditClient={handleEditClient}
           handleSaveClient={handleSaveClient}
-          handleToggleConcept={handleToggleConcept}
-          resetClientForm={resetClientForm}
-          selectedClient={selectedClient}
-          selectedClientId={selectedClientId}
-          setClientForm={setClientForm}
-          setConceptForm={setConceptForm}
-          setSelectedClientId={setSelectedClientId}
-        />
-      );
-    }
-
-    if (activeSection === 'payments') {
-      return (
-        <PaymentsView
-          clients={clients}
+          handleGenerateClientReport={handleGenerateClientReport}
           handleRegisterPayment={handleRegisterPayment}
+          handleSelectClient={handleSelectClient}
+          handleShowClientsList={handleShowClientsList}
+          handleShowClientReport={handleShowClientReport}
+          handleStartClientPayment={handleStartClientPayment}
+          handleToggleConcept={handleToggleConcept}
+          handleStartNewClient={handleStartNewClient}
+          handleUpdateConcept={handleUpdateConcept}
+          isClientReportLoading={isClientReportLoading}
           paymentForm={paymentForm}
           paymentMethods={PAYMENT_METHODS}
           payments={payments}
+          resetClientForm={resetClientForm}
+          selectedClient={selectedClient}
+          setClientForm={setClientForm}
+          setConceptForm={setConceptForm}
           setPaymentForm={setPaymentForm}
-        />
-      );
-    }
-
-    if (activeSection === 'reports') {
-      return (
-        <ReportsView
-          clients={clients}
-          report={report}
-          reportClientId={reportClientId}
-          setReportClientId={setReportClientId}
         />
       );
     }
@@ -488,7 +527,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+      <Sidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
       <section className="workspace">
         {errorMessage && (
           <div className="status-panel error-panel" role="alert">

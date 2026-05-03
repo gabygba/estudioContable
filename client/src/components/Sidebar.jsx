@@ -1,10 +1,8 @@
-import { Banknote, BriefcaseBusiness, CircleDollarSign, FileText, Users } from 'lucide-react';
+import { BriefcaseBusiness, CircleDollarSign, Users } from 'lucide-react';
 
 const navItems = [
   { id: 'dashboard', label: 'Home', icon: CircleDollarSign },
-  { id: 'clients', label: 'Clientes y conceptos', icon: Users },
-  { id: 'payments', label: 'Pagos', icon: Banknote },
-  { id: 'reports', label: 'Reportes', icon: FileText },
+  { id: 'clients', label: 'Clientes', icon: Users },
   { id: 'employees', label: 'Empleados', icon: BriefcaseBusiness },
 ];
 

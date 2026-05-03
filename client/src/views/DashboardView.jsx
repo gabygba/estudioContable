@@ -38,9 +38,9 @@ export function DashboardView({ charges, clients, dashboard, payments, setActive
           <p className="eyebrow">Panel inicial</p>
           <h1>Cuenta corriente de clientes</h1>
         </div>
-        <button className="primary-button" onClick={() => setActiveSection('payments')} type="button">
+        <button className="primary-button" onClick={() => setActiveSection('clients')} type="button">
           <Plus size={18} />
-          Registrar pago
+          Ver clientes
         </button>
       </header>
 
@@ -95,8 +95,8 @@ export function DashboardView({ charges, clients, dashboard, payments, setActive
             <button className="secondary-button" onClick={() => setActiveSection('clients')} type="button">
               Conceptos por cliente
             </button>
-            <button className="secondary-button" onClick={() => setActiveSection('reports')} type="button">
-              Reporte imprimible
+            <button className="secondary-button" onClick={() => setActiveSection('clients')} type="button">
+              Reportes de clientes
             </button>
             <button className="secondary-button" onClick={() => setActiveSection('employees')} type="button">
               Sueldos del estudio
