@@ -1,7 +1,10 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Banknote, FileText, Pencil, Plus, Printer, Save, Trash2, X } from 'lucide-react';
+import { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { ArrowLeft, Banknote, CircleDollarSign, CalendarDays, FileText, Pencil, Plus, Printer, Save, Trash2, X } from 'lucide-react';
 import { PaymentsView } from './PaymentsView.jsx';
-import { formatCurrency, getClientName, getMovementPaymentMethod } from '../utils/formatters.js';
+import { formatCurrency, getClientName, getMovementPaymentMethod, getMovementPaymentMethodTone } from '../utils/formatters.js';
+import { MetricCard } from '../components/MetricCard.jsx';
+
+const PREVIEW_ITEM_COUNT = 3;
 
 function getClientBalance(clientId, charges, payments) {
   const charged = charges
@@ -142,9 +145,35 @@ function ClientsListView({
 }) {
   const latestMovements = getLatestMovements(charges, payments);
   const [selectedMovementId, setSelectedMovementId] = useState(null);
+  const [isActivityCollapsed, setIsActivityCollapsed] = useState(true);
+  const [clientHomePanelHeight, setClientHomePanelHeight] = useState(null);
+  const clientsPanelRef = useRef(null);
+  const visibleClients = clients.slice(0, PREVIEW_ITEM_COUNT);
+  const visibleLatestMovements = isActivityCollapsed ? latestMovements.slice(0, PREVIEW_ITEM_COUNT) : latestMovements;
+  const canToggleActivity = latestMovements.length > PREVIEW_ITEM_COUNT;
   const selectedMovement = selectedMovementId
     ? latestMovements.find((movement) => `${movement.movementType}-${movement.id}` === selectedMovementId)
     : null;
+
+  useLayoutEffect(() => {
+    const panel = clientsPanelRef.current;
+    if (!panel) return undefined;
+
+    const updatePanelHeight = () => {
+      setClientHomePanelHeight(panel.offsetHeight);
+    };
+
+    updatePanelHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updatePanelHeight);
+      return () => window.removeEventListener('resize', updatePanelHeight);
+    }
+
+    const observer = new ResizeObserver(updatePanelHeight);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [visibleClients.length]);
 
   return (
     <>
@@ -165,8 +194,28 @@ function ClientsListView({
         </div>
       </header>
 
-      <section className="content-grid client-home-grid">
-        <article className="panel wide-panel">
+      <section className="metric-grid" aria-label="Resumen">
+        {(() => {
+          const totalPending = clients.reduce((sum, client) => sum + Math.max(0, getClientBalance(client.id, charges, payments)), 0);
+          const clientsWithDebt = clients.filter((c) => getClientBalance(c.id, charges, payments) > 0).length;
+          const collected = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+          const activeConcepts = clients.reduce((sum, c) => sum + (Array.isArray(c.defaultConcepts) ? c.defaultConcepts.filter((d) => d.active).length : 0), 0);
+
+          const metrics = [
+            { label: 'Saldo pendiente', value: formatCurrency(totalPending), detail: `${clientsWithDebt} clientes con deuda`, icon: CircleDollarSign },
+            { label: 'Cobrado registrado', value: formatCurrency(collected), detail: `${payments.length} pagos cargados`, icon: Banknote },
+            { label: 'Conceptos activos', value: activeConcepts, detail: 'Importes por defecto por cliente', icon: CalendarDays },
+          ];
+
+          return metrics.map((metric) => <MetricCard {...metric} key={metric.label} />);
+        })()}
+      </section>
+
+      <section
+        className="content-grid client-home-grid"
+        style={clientHomePanelHeight ? { '--client-home-panel-height': `${clientHomePanelHeight}px` } : undefined}
+      >
+        <article className="panel wide-panel clients-list-panel" ref={clientsPanelRef}>
           <div className="panel-header">
             <div>
               <p className="eyebrow">Listado</p>
@@ -174,36 +223,38 @@ function ClientsListView({
             </div>
           </div>
 
-          <div className="table-list">
-            {clients.map((client) => (
-              <div className="table-row client-list-row" key={client.id}>
-                <button className="client-select-button" onClick={() => handleSelectClient(client.id)} type="button">
-                  <div>
-                    <strong>{client.name}</strong>
-                    <span>
-                      {client.cuit} {client.email ? `- ${client.email}` : ''}
-                    </span>
-                  </div>
-                  <div>
-                    <span>Saldo</span>
-                    <strong>{formatCurrency(getClientBalance(client.id, charges, payments))}</strong>
-                  </div>
-                </button>
-                <button
-                  className="icon-button danger"
-                  onClick={() => handleDeleteClient(client.id)}
-                  type="button"
-                  aria-label={`Eliminar ${client.name}`}
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            ))}
-            {clients.length === 0 && <p className="empty-state">Todavia no hay clientes cargados.</p>}
+          <div className="table-list clients-scroll-list-container">
+            <div className="clients-scroll-list">
+              {visibleClients.map((client) => (
+                <div className="table-row client-list-row" key={client.id}>
+                  <button className="client-select-button" onClick={() => handleSelectClient(client.id)} type="button">
+                    <div>
+                      <strong>{client.name}</strong>
+                      <span>
+                        {client.cuit} {client.email ? `- ${client.email}` : ''}
+                      </span>
+                    </div>
+                    <div>
+                      <span>Saldo</span>
+                      <strong>{formatCurrency(getClientBalance(client.id, charges, payments))}</strong>
+                    </div>
+                  </button>
+                  <button
+                    className="icon-button danger"
+                    onClick={() => handleDeleteClient(client.id)}
+                    type="button"
+                    aria-label={`Eliminar ${client.name}`}
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              ))}
+              {clients.length === 0 && <p className="empty-state">Todavia no hay clientes cargados.</p>}
+            </div>
           </div>
         </article>
 
-        <article className="panel">
+        <article className={`panel clients-activity-panel ${isActivityCollapsed ? '' : 'is-expanded'}`}>
           <div className="panel-header">
             <div>
               <p className="eyebrow">Actividad</p>
@@ -211,32 +262,42 @@ function ClientsListView({
             </div>
           </div>
 
-          <div className="movement-list">
-            {latestMovements.length > 0 && (
-              <div className="movement-list-head" aria-hidden="true">
-                <span>Nombre y apellido</span>
-                <span>Importe</span>
-                <span>Medio de pago</span>
-              </div>
-            )}
-            {latestMovements.map((movement) => (
+          <div className="movement-list clients-scroll-list-container">
+            <div className="movement-list clients-scroll-list">
+              {latestMovements.length > 0 && (
+                <div className="movement-list-head client-home-movement-head" aria-hidden="true">
+                  <span>Nombre y apellido</span>
+                  <span>Fecha</span>
+                  <span>Importe</span>
+                </div>
+              )}
+              {visibleLatestMovements.map((movement) => (
+                <button
+                  className="movement-row compact-movement-row movement-button movement-record-row client-home-movement-row"
+                  key={`${movement.movementType}-${movement.id}`}
+                  onClick={() => setSelectedMovementId(`${movement.movementType}-${movement.id}`)}
+                  type="button"
+                >
+                  <div>
+                    <strong>{getClientName(clients, movement.clientId)}</strong>
+                  </div>
+                  <div>
+                    <span>{movement.date}</span>
+                  </div>
+                  <strong>{formatCurrency(movement.amount)}</strong>
+                </button>
+              ))}
+              {latestMovements.length === 0 && <p className="empty-state">Todavia no hay movimientos.</p>}
+            </div>
+            {canToggleActivity && (
               <button
-                className="movement-row compact-movement-row movement-button movement-record-row"
-                key={`${movement.movementType}-${movement.id}`}
-                onClick={() => setSelectedMovementId(`${movement.movementType}-${movement.id}`)}
+                className="secondary-button compact-button activity-toggle-button"
+                onClick={() => setIsActivityCollapsed((currentValue) => !currentValue)}
                 type="button"
               >
-                <div>
-                  <strong>{getClientName(clients, movement.clientId)}</strong>
-                  <span>
-                    {movement.date} - {movement.concept}
-                  </span>
-                </div>
-                <strong>{formatCurrency(movement.amount)}</strong>
-                <span className="payment-method-cell">{getMovementPaymentMethod(movement)}</span>
+                {isActivityCollapsed ? 'Mostrar más' : 'Mostrar menos'}
               </button>
-            ))}
-            {latestMovements.length === 0 && <p className="empty-state">Todavia no hay movimientos.</p>}
+            )}
           </div>
         </article>
       </section>
@@ -589,6 +650,9 @@ function ClientDetailView({
   const isEditingClient = editingClientId === selectedClient.id;
   const [showAddConceptForm, setShowAddConceptForm] = useState(false);
   const addConceptRef = useRef(null);
+  const [isActivityCollapsed, setIsActivityCollapsed] = useState(true);
+  const [clientDetailPanelHeight, setClientDetailPanelHeight] = useState(null);
+  const detailPanelRef = useRef(null);
 
   useEffect(() => {
     if (showAddConceptForm && addConceptRef.current) {
@@ -606,11 +670,32 @@ function ClientDetailView({
     ...clientCharges.map((charge) => ({ ...charge, movementType: 'Debito' })),
     ...clientPayments.map((payment) => ({ ...payment, movementType: 'Pago' })),
   ].sort((a, b) => b.date.localeCompare(a.date));
-  const recentMovements = allMovements.slice(0, 5);
+  const recentMovements = isActivityCollapsed ? allMovements.slice(0, PREVIEW_ITEM_COUNT) : allMovements;
+  const canToggleActivity = allMovements.length > 0;
 
   const selectedMovement = selectedMovementId
     ? allMovements.find((movement) => `${movement.movementType}-${movement.id}` === selectedMovementId)
     : null;
+
+  useLayoutEffect(() => {
+    const panel = detailPanelRef.current;
+    if (!panel) return undefined;
+
+    const updatePanelHeight = () => {
+      setClientDetailPanelHeight(panel.offsetHeight);
+    };
+
+    updatePanelHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updatePanelHeight);
+      return () => window.removeEventListener('resize', updatePanelHeight);
+    }
+
+    const observer = new ResizeObserver(updatePanelHeight);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [isEditingClient, selectedClient.id]);
 
   function handleCloseAddConceptForm() {
     setShowAddConceptForm(false);
@@ -660,8 +745,29 @@ function ClientDetailView({
         </button>
       </header>
 
-      <section className="content-grid">
-        <article className="panel wide-panel">
+      <section className="metric-grid" aria-label="Resumen del cliente">
+        {(() => {
+          const pending = getClientBalance(selectedClient.id, charges, payments);
+          const collected = payments
+            .filter((p) => p.clientId === selectedClient.id)
+            .reduce((sum, p) => sum + Number(p.amount), 0);
+          const activeConcepts = (selectedClient.defaultConcepts || []).filter((c) => c.active).length;
+
+          const metrics = [
+            { label: 'Saldo pendiente', value: formatCurrency(pending), detail: `${pending > 0 ? 'Con deuda' : 'Sin deuda'}`, icon: CircleDollarSign },
+            { label: 'Cobrado registrado', value: formatCurrency(collected), detail: `${payments.filter((p) => p.clientId === selectedClient.id).length} pagos cargados`, icon: Banknote },
+            { label: 'Conceptos activos', value: activeConcepts, detail: 'Importes por defecto del cliente', icon: CalendarDays },
+          ];
+
+          return metrics.map((metric) => <MetricCard {...metric} key={metric.label} />);
+        })()}
+      </section>
+
+      <section
+        className="content-grid client-detail-grid"
+        style={clientDetailPanelHeight ? { '--client-detail-panel-height': `${clientDetailPanelHeight}px` } : undefined}
+      >
+        <article className="panel wide-panel client-detail-panel" ref={detailPanelRef}>
           <div className="panel-header">
             <div>
               <p className="eyebrow">Detalle</p>
@@ -675,7 +781,7 @@ function ClientDetailView({
                   type="button"
                 >
                   <Plus size={18} />
-                  Agregar concepto recurrente
+                  Agregar concepto
                 </button>
                 <button
                   className="secondary-button"
@@ -766,9 +872,10 @@ function ClientDetailView({
               </div>
             </div>
           )}
+
         </article>
 
-        <article className="panel">
+        <article className={`panel clients-activity-panel client-detail-activity-panel ${isActivityCollapsed ? '' : 'is-expanded'}`}>
           <div className="panel-header">
             <div>
               <p className="eyebrow">Actividad</p>
@@ -776,32 +883,42 @@ function ClientDetailView({
             </div>
           </div>
 
-          <div className="movement-list compact-history-list">
-            {recentMovements.length > 0 && (
-              <div className="movement-list-head" aria-hidden="true">
-                <span>Nombre y apellido</span>
+          <div className="movement-list clients-scroll-list-container">
+            <div className="movement-list clients-scroll-list">
+            {allMovements.length > 0 && (
+              <div className="movement-list-head client-detail-movement-head" aria-hidden="true">
+                <span>Fecha</span>
                 <span>Importe</span>
                 <span>Medio de pago</span>
               </div>
             )}
             {recentMovements.map((movement) => (
               <button
-                className="movement-row compact-movement-row movement-button movement-record-row"
+                className="movement-row compact-movement-row movement-button movement-record-row client-detail-movement-row"
                 key={`${movement.movementType}-${movement.id}`}
                 onClick={() => setSelectedMovementId(`${movement.movementType}-${movement.id}`)}
                 type="button"
               >
                 <div>
-                  <strong>{selectedClient.name}</strong>
-                  <span>
-                    {movement.date} - {movement.concept}
-                  </span>
+                  <span>{movement.date}</span>
                 </div>
                 <strong>{formatCurrency(movement.amount)}</strong>
-                <span className="payment-method-cell">{getMovementPaymentMethod(movement)}</span>
+                <span className={`payment-method-cell payment-method-pill payment-method-${getMovementPaymentMethodTone(movement)}`}>
+                  {getMovementPaymentMethod(movement)}
+                </span>
               </button>
             ))}
-            {recentMovements.length === 0 && <p className="empty-state">Este cliente todavia no tiene movimientos.</p>}
+            {allMovements.length === 0 && <p className="empty-state">Este cliente todavia no tiene movimientos.</p>}
+            </div>
+            {canToggleActivity && (
+              <button
+                className="secondary-button compact-button activity-toggle-button"
+                onClick={() => setIsActivityCollapsed((currentValue) => !currentValue)}
+                type="button"
+              >
+                {isActivityCollapsed ? 'Mostrar más' : 'Mostrar menos'}
+              </button>
+            )}
           </div>
         </article>
       </section>
@@ -860,7 +977,7 @@ function ClientDetailView({
         </form>
       )}
 
-      <section className="panel full-panel">
+      <section className="panel full-panel concepts-panel">
         <div className="panel-header">
           <div>
             <p className="eyebrow">Base de cobro</p>

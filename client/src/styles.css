@@ -27,6 +27,14 @@ button, .primary-button, .secondary-button, .ghost-button, .icon-button, .status
   transition: background-color 180ms ease, color 180ms ease, transform 160ms ease, opacity 160ms ease;
 }
 
+button:focus {
+  outline: 0;
+}
+
+button:focus-visible {
+  box-shadow: 0 0 0 3px rgb(31 122 91 / 18%);
+}
+
 button:active, .nav-item:active {
   transform: translateY(1px);
 }
@@ -343,6 +351,7 @@ h2 {
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.58fr);
+  align-items: start;
   gap: 16px;
   margin-top: 16px;
 }
@@ -354,6 +363,115 @@ h2 {
 .client-home-grid {
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.62fr);
   margin-top: 28px;
+}
+
+.clients-list-panel,
+.clients-activity-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.clients-list-panel .table-list,
+.clients-activity-panel .movement-list {
+  min-height: 0;
+}
+
+.clients-scroll-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.clients-scroll-list {
+  overflow-y: auto;
+}
+
+.client-home-grid .clients-activity-panel {
+  height: var(--client-home-panel-height, auto);
+  overflow: hidden;
+}
+
+.client-home-grid .clients-activity-panel.is-expanded {
+  height: auto;
+  overflow: visible;
+}
+
+.client-home-grid .clients-activity-panel .clients-scroll-list-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.client-home-grid .clients-activity-panel.is-expanded .clients-scroll-list-container {
+  overflow: visible;
+}
+
+.client-home-grid .clients-activity-panel .clients-scroll-list {
+  flex: 1;
+  min-height: 0;
+}
+
+.client-home-grid .clients-activity-panel.is-expanded .clients-scroll-list {
+  overflow: visible;
+}
+
+.client-home-grid .activity-toggle-button {
+  flex: 0 0 auto;
+}
+
+.client-detail-grid .client-detail-activity-panel {
+  height: var(--client-detail-panel-height, auto);
+  overflow: hidden;
+  padding: 16px;
+}
+
+.client-detail-grid .client-detail-activity-panel.is-expanded {
+  height: auto;
+  overflow: visible;
+}
+
+.client-detail-grid .client-detail-activity-panel .clients-scroll-list-container {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.client-detail-grid .client-detail-activity-panel.is-expanded .clients-scroll-list-container {
+  overflow: visible;
+}
+
+.client-detail-grid .client-detail-activity-panel .clients-scroll-list {
+  flex: 1;
+  min-height: 0;
+}
+
+.client-detail-grid .client-detail-activity-panel.is-expanded .clients-scroll-list {
+  overflow: visible;
+}
+
+.client-detail-grid .activity-toggle-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+}
+
+.client-detail-activity-panel .panel-header {
+  gap: 10px;
+}
+
+.client-detail-activity-panel h2 {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.clients-toggle-button,
+.activity-toggle-button {
+  align-self: center;
+  margin-top: 4px;
 }
 
 .report-builder-grid {
@@ -467,8 +585,8 @@ h2 {
 .table-list,
 .quick-actions {
   display: grid;
-  gap: 4px;
-  margin-top: 18px;
+  gap: 0;
+  margin-top: 0;
   overflow-x: auto;
 }
 
@@ -482,8 +600,8 @@ h2 {
 
 .movement-row,
 .table-row {
-  min-height: 66px;
-  padding: 10px 0;
+  min-height: 38px;
+  padding: 2px 0;
   border-top: 1px solid #edf1f3;
 }
 
@@ -493,6 +611,28 @@ h2 {
   grid-template-columns: minmax(0, 1fr) 120px 130px;
   align-items: center;
   gap: 16px;
+}
+
+.client-home-movement-head,
+.client-home-movement-row {
+  grid-template-columns: minmax(0, 1fr) 104px 118px;
+}
+
+.client-detail-movement-head,
+.client-detail-movement-row {
+  grid-template-columns: minmax(82px, 0.8fr) minmax(92px, 0.75fr) minmax(104px, 1fr);
+  gap: 10px;
+}
+
+.client-home-movement-head {
+  margin-top: 14px;
+  padding-bottom: 12px;
+}
+
+.client-detail-movement-head {
+  margin-top: 14px;
+  padding-bottom: 10px;
+  font-size: 0.68rem;
 }
 
 .movement-list-head {
@@ -515,8 +655,50 @@ h2 {
 }
 
 .payment-method-cell {
-  color: #52606a;
+  justify-self: center;
+}
+
+.payment-method-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 0.92rem;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.payment-method-none {
+  background: #eef3f4;
+  color: #66737d;
+}
+
+.payment-method-default {
+  background: #eef3f4;
+  color: #52606a;
+}
+
+.payment-method-cash {
+  background: #dff6e9;
+  color: #1d6d48;
+}
+
+.payment-method-transfer {
+  background: #dff2ff;
+  color: #17658f;
+}
+
+.payment-method-card {
+  background: #e8edff;
+  color: #3a4fa3;
+}
+
+.payment-method-check {
+  background: #fff3d7;
+  color: #8a5d00;
 }
 
 .movement-row:first-child,
@@ -551,6 +733,29 @@ h2 {
   min-height: 58px;
 }
 
+.client-home-movement-row {
+  min-height: 54px;
+}
+
+.client-detail-movement-row {
+  min-height: 44px;
+  padding: 4px 0;
+}
+
+.client-detail-movement-row span {
+  font-size: 0.86rem;
+}
+
+.client-detail-movement-row > strong {
+  font-size: 0.95rem;
+}
+
+.client-detail-movement-row .payment-method-pill {
+  min-width: 96px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
 .badge {
   min-width: 82px;
   padding: 5px 9px;
@@ -570,6 +775,10 @@ h2 {
 .concept-row {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) 150px 96px 150px;
+}
+
+.concepts-panel .table-list {
+  margin-top: 18px;
 }
 
 .concept-detail-row {
@@ -636,16 +845,26 @@ h2 {
   gap: 12px;
 }
 
+.clients-list-panel .client-list-row {
+  min-height: 68px;
+  padding: 8px 0;
+}
+
 .client-select-button {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) 150px;
   align-items: center;
   gap: 16px;
-  min-height: 58px;
+  min-height: 38px;
   border: 0;
   background: transparent;
   color: inherit;
   text-align: left;
+}
+
+.clients-list-panel .client-select-button {
+  min-height: 54px;
+  padding: 8px 12px;
 }
 
 .client-select-button:hover {
@@ -1030,6 +1249,16 @@ h2 {
   .client-home-grid,
   .report-builder-grid {
     grid-template-columns: 1fr;
+  }
+
+  .client-home-grid .clients-activity-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .client-detail-grid .client-detail-activity-panel {
+    height: auto;
+    overflow: visible;
   }
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Banknote, CalendarDays, CircleDollarSign, Plus, ReceiptText } from 'lucide-react';
+import { Banknote, CalendarDays, CircleDollarSign, ReceiptText } from 'lucide-react';
 import { MetricCard } from '../components/MetricCard.jsx';
-import { formatCurrency, getClientName, getMovementPaymentMethod } from '../utils/formatters.js';
+import { formatCurrency, getClientName, getMovementPaymentMethod, getMovementPaymentMethodTone } from '../utils/formatters.js';
 import { MovementDetailModal } from './ClientsView.jsx';
 
 export function DashboardView({ charges, clients, dashboard, payments, setActiveSection }) {
@@ -45,7 +45,6 @@ export function DashboardView({ charges, clients, dashboard, payments, setActive
           <h1>Cuenta corriente de clientes</h1>
         </div>
         <button className="primary-button" onClick={() => setActiveSection('clients')} type="button">
-          <Plus size={18} />
           Ver clientes
         </button>
       </header>
@@ -95,7 +94,9 @@ export function DashboardView({ charges, clients, dashboard, payments, setActive
                   </span>
                 </div>
                 <strong>{formatCurrency(movement.amount)}</strong>
-                <span className="payment-method-cell">{getMovementPaymentMethod(movement)}</span>
+                <span className={`payment-method-cell payment-method-pill payment-method-${getMovementPaymentMethodTone(movement)}`}>
+                  {getMovementPaymentMethod(movement)}
+                </span>
               </button>
             ))}
             {latestMovements.length === 0 && <p className="empty-state">Todavia no hay movimientos.</p>}

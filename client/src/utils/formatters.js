@@ -18,6 +18,19 @@ export function getMovementPaymentMethod(movement) {
   return movement.method || 'Sin medio';
 }
 
+export function getMovementPaymentMethodTone(movement) {
+  if (movement.movementType !== 'Pago') return 'none';
+
+  const method = (movement.method || '').trim().toLowerCase();
+
+  if (method.includes('efectivo')) return 'cash';
+  if (method.includes('transfer')) return 'transfer';
+  if (method.includes('tarjeta')) return 'card';
+  if (method.includes('cheque')) return 'check';
+
+  return 'default';
+}
+
 export function getEmployeeName(employees, employeeId) {
   return employees.find((employee) => employee.id === Number(employeeId))?.name ?? 'Sin empleado';
 }
