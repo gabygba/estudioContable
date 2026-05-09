@@ -24,8 +24,30 @@ function pickExistingId(collection, currentId) {
   return collection.some((item) => item.id === Number(currentId)) ? Number(currentId) : (collection[0]?.id ?? '');
 }
 
-function getFirstConcept(client) {
-  return client?.defaultConcepts?.[0]?.concept ?? 'Honorarios';
+function getPaymentConcepts(payment) {
+  if (Array.isArray(payment.concepts) && payment.concepts.length > 0) {
+    return payment.concepts;
+  }
+
+  if (payment.concept) {
+    return [{ concept: payment.concept, amount: Number(payment.amount) }];
+  }
+
+  return [];
+}
+
+function getCollectedAmountByConcept(payments, targetConcept) {
+  return payments.reduce((total, payment) => {
+    const conceptLines = getPaymentConcepts(payment);
+
+    return (
+      total +
+      conceptLines.reduce(
+        (lineTotal, line) => lineTotal + (line.concept === targetConcept ? Number(line.amount || 0) : 0),
+        0,
+      )
+    );
+  }, 0);
 }
 
 function App() {
@@ -81,14 +103,17 @@ function App() {
       setSelectedClientId((currentId) => pickExistingId(clientsData, currentId));
       setPaymentForm((currentForm) => {
         const clientId = pickExistingId(clientsData, currentForm.clientId);
-        const client = clientsData.find((item) => item.id === Number(clientId));
 
         return {
           ...currentForm,
           clientId,
-          concept: client?.defaultConcepts.some((item) => item.concept === currentForm.concept)
-            ? currentForm.concept
-            : getFirstConcept(client),
+          concepts: Array.isArray(currentForm.concepts)
+            ? currentForm.concepts.filter((item) =>
+                clientsData
+                  .find((client) => client.id === Number(clientId))
+                  ?.defaultConcepts.some((concept) => concept.id === item.conceptId || concept.concept === item.concept),
+              )
+            : [],
         };
       });
       setSalaryForm((currentForm) => ({
@@ -109,10 +134,7 @@ function App() {
   const selectedClient = clients.find((client) => client.id === Number(selectedClientId)) ?? clients[0] ?? null;
 
   const honorariosCollected = useMemo(
-    () =>
-      payments
-        .filter((payment) => payment.concept === 'Honorarios')
-        .reduce((total, payment) => total + Number(payment.amount), 0),
+    () => getCollectedAmountByConcept(payments, 'Honorarios'),
     [payments],
   );
 
@@ -152,14 +174,11 @@ function App() {
   }
 
   function handleStartClientPayment(clientId) {
-    const client = clients.find((item) => item.id === Number(clientId));
-
     setSelectedClientId(clientId);
     setPaymentForm((currentForm) => ({
       ...currentForm,
       clientId,
-      concept: getFirstConcept(client),
-      amount: '',
+      concepts: [],
       receipt: '',
     }));
     setClientScreen('payment');
@@ -202,7 +221,7 @@ function App() {
       setPaymentForm((currentForm) => ({
         ...currentForm,
         clientId: savedClient.id,
-        concept: getFirstConcept(savedClient),
+        concepts: [],
       }));
       setClientScreen('detail');
     } catch (error) {
@@ -256,23 +275,6 @@ function App() {
     }
   }
 
-  function handleConceptFieldChange(conceptId, field, value) {
-    if (!selectedClient) return;
-
-    setClients((currentClients) =>
-      currentClients.map((client) =>
-        client.id === selectedClient.id
-          ? {
-              ...client,
-              defaultConcepts: client.defaultConcepts.map((concept) =>
-                concept.id === conceptId ? { ...concept, [field]: value } : concept,
-              ),
-            }
-          : client,
-      ),
-    );
-  }
-
   async function handleUpdateConcept(conceptId, patch) {
     if (!selectedClient) return;
 
@@ -280,76 +282,38 @@ function App() {
       await accountingApi.updateConcept(selectedClient.id, conceptId, patch);
       const dashboardData = await accountingApi.getDashboard();
       setDashboard(dashboardData);
+      return true;
     } catch (error) {
       setErrorMessage(error.message);
       await loadApplicationData();
-    }
-  }
-
-  async function handleToggleConcept(conceptId) {
-    if (!selectedClient) return;
-
-    const concept = selectedClient.defaultConcepts.find((item) => item.id === conceptId);
-    if (!concept) return;
-
-    const active = !concept.active;
-
-    setClients((currentClients) =>
-      currentClients.map((client) =>
-        client.id === selectedClient.id
-          ? {
-              ...client,
-              defaultConcepts: client.defaultConcepts.map((item) =>
-                item.id === conceptId ? { ...item, active } : item,
-              ),
-            }
-          : client,
-      ),
-    );
-
-    try {
-      await accountingApi.updateConcept(selectedClient.id, conceptId, { active });
-      const dashboardData = await accountingApi.getDashboard();
-      setDashboard(dashboardData);
-    } catch (error) {
-      setErrorMessage(error.message);
-      await loadApplicationData();
-    }
-  }
-
-  async function handleCreateCharge(concept) {
-    if (!selectedClient) return;
-
-    try {
-      await accountingApi.createCharge({
-        clientId: selectedClient.id,
-        date: new Date().toISOString().slice(0, 10),
-        concept: concept.concept,
-        amount: concept.amount,
-      });
-      await loadApplicationData();
-    } catch (error) {
-      setErrorMessage(error.message);
+      return false;
     }
   }
 
   async function handleRegisterPayment(event) {
     event.preventDefault();
 
+    const conceptLines = (paymentForm.concepts ?? [])
+      .map((item) => ({
+        conceptId: item.conceptId ? Number(item.conceptId) : undefined,
+        concept: item.concept,
+        amount: Number(item.amount),
+      }))
+      .filter((item) => item.concept && item.amount > 0);
+
     const payload = {
       clientId: Number(paymentForm.clientId),
       date: paymentForm.date,
-      concept: paymentForm.concept,
-      amount: Number(paymentForm.amount),
+      concepts: conceptLines,
       method: paymentForm.method,
       receipt: paymentForm.receipt,
     };
 
-    if (!payload.clientId || !payload.amount) return;
+    if (!payload.clientId || conceptLines.length === 0) return;
 
     try {
       await accountingApi.createPayment(payload);
-      setPaymentForm((currentForm) => ({ ...currentForm, amount: '', receipt: '' }));
+      setPaymentForm((currentForm) => ({ ...currentForm, concepts: [], receipt: '' }));
       await loadApplicationData();
     } catch (error) {
       setErrorMessage(error.message);
@@ -478,8 +442,6 @@ function App() {
           editingClientId={editingClientId}
           handleAddConcept={handleAddConcept}
           handleCancelClientForm={handleCancelClientForm}
-          handleConceptFieldChange={handleConceptFieldChange}
-          handleCreateCharge={handleCreateCharge}
           handleDeleteClient={handleDeleteClient}
           handleEditClient={handleEditClient}
           handleSaveClient={handleSaveClient}
@@ -489,7 +451,6 @@ function App() {
           handleShowClientsList={handleShowClientsList}
           handleShowClientReport={handleShowClientReport}
           handleStartClientPayment={handleStartClientPayment}
-          handleToggleConcept={handleToggleConcept}
           handleStartNewClient={handleStartNewClient}
           handleUpdateConcept={handleUpdateConcept}
           isClientReportLoading={isClientReportLoading}

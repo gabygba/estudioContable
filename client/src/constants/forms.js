@@ -15,8 +15,7 @@ export const EMPTY_CONCEPT_FORM = { concept: '', amount: '', dueDay: '10' };
 export function createInitialPaymentForm(clientId = '') {
   return {
     clientId,
-    concept: 'Honorarios',
-    amount: '',
+    concepts: [],
     date: new Date().toISOString().slice(0, 10),
     method: PAYMENT_METHODS[0],
     receipt: '',

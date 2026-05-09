@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft, Banknote, ChevronRight, X } from 'lucide-react';
 import { formatCurrency, getClientName } from '../utils/formatters.js';
 
@@ -13,14 +13,55 @@ export function PaymentsView({
   setPaymentForm,
 }) {
   const [selectedPaymentId, setSelectedPaymentId] = useState(null);
-  
+
   const selectedClient =
     clients.find((client) => client.id === Number(lockedClientId ?? paymentForm.clientId)) ?? clients[0] ?? null;
+  const availableConcepts = selectedClient?.defaultConcepts.filter((concept) => concept.active) ?? [];
+  const selectedConcepts = paymentForm.concepts ?? [];
+  const totalAmount = useMemo(
+    () => selectedConcepts.reduce((total, item) => total + Number(item.amount || 0), 0),
+    [selectedConcepts],
+  );
   const visiblePayments = lockedClientId
     ? payments.filter((payment) => payment.clientId === Number(lockedClientId))
     : payments;
-  
-  const selectedPayment = selectedPaymentId ? visiblePayments.find((p) => p.id === selectedPaymentId) : null;
+
+  const selectedPayment = selectedPaymentId ? visiblePayments.find((payment) => payment.id === selectedPaymentId) : null;
+
+  function handleClientChange(clientId) {
+    setPaymentForm({
+      ...paymentForm,
+      clientId,
+      concepts: [],
+    });
+  }
+
+  function handleToggleConcept(concept) {
+    const exists = selectedConcepts.some((item) => Number(item.conceptId) === concept.id);
+
+    setPaymentForm({
+      ...paymentForm,
+      concepts: exists
+        ? selectedConcepts.filter((item) => Number(item.conceptId) !== concept.id)
+        : [
+            ...selectedConcepts,
+            {
+              conceptId: concept.id,
+              concept: concept.concept,
+              amount: String(concept.amount),
+            },
+          ],
+    });
+  }
+
+  function handleConceptAmountChange(conceptId, amount) {
+    setPaymentForm({
+      ...paymentForm,
+      concepts: selectedConcepts.map((item) =>
+        Number(item.conceptId) === conceptId ? { ...item, amount } : item,
+      ),
+    });
+  }
 
   return (
     <>
@@ -52,15 +93,7 @@ export function PaymentsView({
               <select
                 disabled={clients.length === 0}
                 value={paymentForm.clientId}
-                onChange={(event) =>
-                  setPaymentForm({
-                    ...paymentForm,
-                    clientId: Number(event.target.value),
-                    concept:
-                      clients.find((client) => client.id === Number(event.target.value))?.defaultConcepts[0]
-                        ?.concept ?? 'Honorarios',
-                  })
-                }
+                onChange={(event) => handleClientChange(Number(event.target.value))}
               >
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
@@ -70,31 +103,47 @@ export function PaymentsView({
               </select>
             </label>
           )}
-          <label className="field">
-            Concepto
-            <select
-              value={paymentForm.concept}
-              onChange={(event) => setPaymentForm({ ...paymentForm, concept: event.target.value })}
-            >
-              {selectedClient?.defaultConcepts.map((item) => (
-                <option key={item.id} value={item.concept}>
-                  {item.concept}
-                </option>
-              ))}
-              {!selectedClient?.defaultConcepts.length && <option value="Honorarios">Honorarios</option>}
-            </select>
-          </label>
+
+          <div className="field">
+            Conceptos a imputar
+            <div className="concept-payment-list">
+              {availableConcepts.map((concept) => {
+                const selectedConcept = selectedConcepts.find((item) => Number(item.conceptId) === concept.id);
+
+                return (
+                  <label className={`concept-payment-item ${selectedConcept ? 'selected' : ''}`} key={concept.id}>
+                    <div className="concept-payment-main">
+                      <input
+                        checked={Boolean(selectedConcept)}
+                        onChange={() => handleToggleConcept(concept)}
+                        type="checkbox"
+                      />
+                      <div>
+                        <strong>{concept.concept}</strong>
+                        <span>Vence dia {concept.dueDay}</span>
+                      </div>
+                    </div>
+                    <input
+                      disabled={!selectedConcept}
+                      min="0"
+                      onChange={(event) => handleConceptAmountChange(concept.id, event.target.value)}
+                      type="number"
+                      value={selectedConcept?.amount ?? ''}
+                    />
+                  </label>
+                );
+              })}
+              {availableConcepts.length === 0 && (
+                <p className="empty-state">Este cliente no tiene conceptos activos disponibles para imputar.</p>
+              )}
+            </div>
+          </div>
+
           <div className="form-grid">
-            <label className="field">
-              Importe
-              <input
-                min="0"
-                onChange={(event) => setPaymentForm({ ...paymentForm, amount: event.target.value })}
-                placeholder="0"
-                type="number"
-                value={paymentForm.amount}
-              />
-            </label>
+            <div className="readonly-field">
+              <span>Total imputado</span>
+              <strong>{formatCurrency(totalAmount)}</strong>
+            </div>
             <label className="field">
               Fecha
               <input
@@ -125,7 +174,7 @@ export function PaymentsView({
               value={paymentForm.receipt}
             />
           </label>
-          <button className="primary-button" disabled={clients.length === 0} type="submit">
+          <button className="primary-button" disabled={clients.length === 0 || totalAmount <= 0} type="submit">
             <Banknote size={18} />
             Registrar pago
           </button>
@@ -166,7 +215,7 @@ export function PaymentsView({
             <div className="panel-header">
               <div>
                 <p className="eyebrow">Detalle</p>
-                <h2>Información del pago</h2>
+                <h2>Informacion del pago</h2>
               </div>
               <button
                 className="icon-button"
@@ -194,6 +243,19 @@ export function PaymentsView({
                 <span className="detail-label">Monto</span>
                 <strong className="detail-value">{formatCurrency(selectedPayment.amount)}</strong>
               </div>
+              {Array.isArray(selectedPayment.concepts) && selectedPayment.concepts.length > 0 && (
+                <div className="detail-row detail-row-stack">
+                  <span className="detail-label">Conceptos imputados</span>
+                  <div className="detail-breakdown">
+                    {selectedPayment.concepts.map((item, index) => (
+                      <div className="detail-breakdown-item" key={`${item.concept}-${index}`}>
+                        <span>{item.concept}</span>
+                        <strong>{formatCurrency(item.amount)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="detail-row">
                 <span className="detail-label">Medio de pago</span>
                 <strong className="detail-value">{selectedPayment.method}</strong>

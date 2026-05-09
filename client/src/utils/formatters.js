@@ -12,6 +12,12 @@ export function getClientName(clients, clientId) {
   return clients.find((client) => client.id === Number(clientId))?.name ?? 'Sin cliente';
 }
 
+export function getMovementPaymentMethod(movement) {
+  if (movement.movementType !== 'Pago') return '-';
+
+  return movement.method || 'Sin medio';
+}
+
 export function getEmployeeName(employees, employeeId) {
   return employees.find((employee) => employee.id === Number(employeeId))?.name ?? 'Sin empleado';
 }

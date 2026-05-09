@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Banknote, CalendarDays, CircleDollarSign, Plus, ReceiptText } from 'lucide-react';
 import { MetricCard } from '../components/MetricCard.jsx';
-import { formatCurrency, getClientName } from '../utils/formatters.js';
+import { formatCurrency, getClientName, getMovementPaymentMethod } from '../utils/formatters.js';
+import { MovementDetailModal } from './ClientsView.jsx';
 
 export function DashboardView({ charges, clients, dashboard, payments, setActiveSection }) {
   const latestMovements = [
@@ -9,6 +11,10 @@ export function DashboardView({ charges, clients, dashboard, payments, setActive
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 5);
+  const [selectedMovementId, setSelectedMovementId] = useState(null);
+  const selectedMovement = selectedMovementId
+    ? latestMovements.find((movement) => `${movement.movementType}-${movement.id}` === selectedMovementId)
+    : null;
 
   const metrics = [
     {
@@ -68,21 +74,29 @@ export function DashboardView({ charges, clients, dashboard, payments, setActive
           </div>
 
           <div className="movement-list">
+            {latestMovements.length > 0 && (
+              <div className="movement-list-head" aria-hidden="true">
+                <span>Nombre y apellido</span>
+                <span>Importe</span>
+                <span>Medio de pago</span>
+              </div>
+            )}
             {latestMovements.map((movement) => (
-              <div className="movement-row" key={`${movement.movementType}-${movement.id}`}>
+              <button
+                className="movement-row movement-button movement-record-row"
+                key={`${movement.movementType}-${movement.id}`}
+                onClick={() => setSelectedMovementId(`${movement.movementType}-${movement.id}`)}
+                type="button"
+              >
                 <div>
                   <strong>{getClientName(clients, movement.clientId)}</strong>
                   <span>
                     {movement.date} - {movement.concept}
                   </span>
                 </div>
-                <div className="movement-meta">
-                  <strong>{formatCurrency(movement.amount)}</strong>
-                  <span className={movement.movementType === 'Pago' ? 'badge paid' : 'badge'}>
-                    {movement.movementType}
-                  </span>
-                </div>
-              </div>
+                <strong>{formatCurrency(movement.amount)}</strong>
+                <span className="payment-method-cell">{getMovementPaymentMethod(movement)}</span>
+              </button>
             ))}
             {latestMovements.length === 0 && <p className="empty-state">Todavia no hay movimientos.</p>}
           </div>
@@ -104,6 +118,10 @@ export function DashboardView({ charges, clients, dashboard, payments, setActive
           </div>
         </article>
       </section>
+
+      {selectedMovement && (
+        <MovementDetailModal movement={selectedMovement} onClose={() => setSelectedMovementId(null)} />
+      )}
     </>
   );
 }

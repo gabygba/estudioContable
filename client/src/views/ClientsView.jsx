@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Banknote, FileText, Pencil, Plus, Printer, Save, Trash2, X, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Banknote, FileText, Pencil, Plus, Printer, Save, Trash2, X } from 'lucide-react';
 import { PaymentsView } from './PaymentsView.jsx';
-import { formatCurrency, getClientName } from '../utils/formatters.js';
+import { formatCurrency, getClientName, getMovementPaymentMethod } from '../utils/formatters.js';
 
 function getClientBalance(clientId, charges, payments) {
   const charged = charges
@@ -33,8 +33,6 @@ export function ClientsView({
   editingClientId,
   handleAddConcept,
   handleCancelClientForm,
-  handleConceptFieldChange,
-  handleCreateCharge,
   handleDeleteClient,
   handleEditClient,
   handleGenerateClientReport,
@@ -44,7 +42,6 @@ export function ClientsView({
   handleShowClientsList,
   handleShowClientReport,
   handleStartClientPayment,
-  handleToggleConcept,
   handleStartNewClient,
   handleUpdateConcept,
   isClientReportLoading,
@@ -90,15 +87,12 @@ export function ClientsView({
         conceptForm={conceptForm}
         editingClientId={editingClientId}
         handleAddConcept={handleAddConcept}
-        handleConceptFieldChange={handleConceptFieldChange}
-        handleCreateCharge={handleCreateCharge}
         handleDeleteClient={handleDeleteClient}
         handleEditClient={handleEditClient}
         handleStartClientPayment={handleStartClientPayment}
         handleSaveClient={handleSaveClient}
         handleSelectClient={handleSelectClient}
         handleShowClientsList={handleShowClientsList}
-        handleToggleConcept={handleToggleConcept}
         handleUpdateConcept={handleUpdateConcept}
         payments={payments}
         resetClientForm={resetClientForm}
@@ -147,6 +141,10 @@ function ClientsListView({
   payments,
 }) {
   const latestMovements = getLatestMovements(charges, payments);
+  const [selectedMovementId, setSelectedMovementId] = useState(null);
+  const selectedMovement = selectedMovementId
+    ? latestMovements.find((movement) => `${movement.movementType}-${movement.id}` === selectedMovementId)
+    : null;
 
   return (
     <>
@@ -214,26 +212,38 @@ function ClientsListView({
           </div>
 
           <div className="movement-list">
+            {latestMovements.length > 0 && (
+              <div className="movement-list-head" aria-hidden="true">
+                <span>Nombre y apellido</span>
+                <span>Importe</span>
+                <span>Medio de pago</span>
+              </div>
+            )}
             {latestMovements.map((movement) => (
-              <div className="movement-row compact-movement-row" key={`${movement.movementType}-${movement.id}`}>
+              <button
+                className="movement-row compact-movement-row movement-button movement-record-row"
+                key={`${movement.movementType}-${movement.id}`}
+                onClick={() => setSelectedMovementId(`${movement.movementType}-${movement.id}`)}
+                type="button"
+              >
                 <div>
                   <strong>{getClientName(clients, movement.clientId)}</strong>
                   <span>
                     {movement.date} - {movement.concept}
                   </span>
                 </div>
-                <div className="movement-meta">
-                  <strong>{formatCurrency(movement.amount)}</strong>
-                  <span className={movement.movementType === 'Pago' ? 'badge paid' : 'badge'}>
-                    {movement.movementType}
-                  </span>
-                </div>
-              </div>
+                <strong>{formatCurrency(movement.amount)}</strong>
+                <span className="payment-method-cell">{getMovementPaymentMethod(movement)}</span>
+              </button>
             ))}
             {latestMovements.length === 0 && <p className="empty-state">Todavia no hay movimientos.</p>}
           </div>
         </article>
       </section>
+
+      {selectedMovement && (
+        <MovementDetailModal movement={selectedMovement} onClose={() => setSelectedMovementId(null)} />
+      )}
     </>
   );
 }
@@ -251,7 +261,16 @@ function ClientReportView({
     const concepts = new Set();
     clients.forEach((client) => client.defaultConcepts.forEach((item) => concepts.add(item.concept)));
     charges.forEach((charge) => concepts.add(charge.concept));
-    payments.forEach((payment) => concepts.add(payment.concept));
+    payments.forEach((payment) => {
+      if (Array.isArray(payment.concepts) && payment.concepts.length > 0) {
+        payment.concepts.forEach((item) => concepts.add(item.concept));
+        return;
+      }
+
+      if (payment.concept) {
+        concepts.add(payment.concept);
+      }
+    });
 
     return Array.from(concepts).sort((a, b) => a.localeCompare(b));
   }, [charges, clients, payments]);
@@ -554,15 +573,12 @@ function ClientDetailView({
   conceptForm,
   editingClientId,
   handleAddConcept,
-  handleConceptFieldChange,
-  handleCreateCharge,
   handleDeleteClient,
   handleEditClient,
   handleStartClientPayment,
   handleSaveClient,
   handleSelectClient,
   handleShowClientsList,
-  handleToggleConcept,
   handleUpdateConcept,
   payments,
   resetClientForm,
@@ -572,19 +588,55 @@ function ClientDetailView({
 }) {
   const isEditingClient = editingClientId === selectedClient.id;
   const [showAddConceptForm, setShowAddConceptForm] = useState(false);
-  const [selectedPaymentId, setSelectedPaymentId] = useState(null);
+  const [selectedMovementId, setSelectedMovementId] = useState(null);
+  const [editingConceptId, setEditingConceptId] = useState(null);
+  const [conceptDraft, setConceptDraft] = useState({ concept: '', amount: '', dueDay: '', active: true });
 
-  const clientPayments = payments.filter((p) => p.clientId === selectedClient.id);
-  const clientCharges = charges.filter((c) => c.clientId === selectedClient.id);
+  const clientPayments = payments.filter((payment) => payment.clientId === selectedClient.id);
+  const clientCharges = charges.filter((charge) => charge.clientId === selectedClient.id);
   const allMovements = [
     ...clientCharges.map((charge) => ({ ...charge, movementType: 'Debito' })),
     ...clientPayments.map((payment) => ({ ...payment, movementType: 'Pago' })),
   ].sort((a, b) => b.date.localeCompare(a.date));
+  const recentMovements = allMovements.slice(0, 5);
 
-  const selectedPayment = selectedPaymentId ? allMovements.find((m) => m.id === selectedPaymentId) : null;
+  const selectedMovement = selectedMovementId
+    ? allMovements.find((movement) => `${movement.movementType}-${movement.id}` === selectedMovementId)
+    : null;
 
   function handleCloseAddConceptForm() {
     setShowAddConceptForm(false);
+  }
+
+  function handleStartConceptEdit(concept) {
+    setEditingConceptId(concept.id);
+    setConceptDraft({
+      concept: concept.concept,
+      amount: String(concept.amount),
+      dueDay: String(concept.dueDay),
+      active: concept.active,
+    });
+  }
+
+  function handleCancelConceptEdit() {
+    setEditingConceptId(null);
+    setConceptDraft({ concept: '', amount: '', dueDay: '', active: true });
+  }
+
+  async function handleSaveConceptEdit(conceptId) {
+    const payload = {
+      concept: conceptDraft.concept.trim(),
+      amount: Number(conceptDraft.amount),
+      dueDay: Number(conceptDraft.dueDay),
+      active: conceptDraft.active,
+    };
+
+    if (!payload.concept || !payload.amount || !payload.dueDay) return;
+
+    const saved = await handleUpdateConcept(conceptId, payload);
+    if (saved !== false) {
+      handleCancelConceptEdit();
+    }
   }
 
   return (
@@ -609,6 +661,14 @@ function ClientDetailView({
             </div>
             {!isEditingClient && (
               <div className="row-actions">
+                <button
+                  className="secondary-button"
+                  onClick={() => setShowAddConceptForm((currentValue) => !currentValue)}
+                  type="button"
+                >
+                  <Plus size={18} />
+                  Agregar concepto recurrente
+                </button>
                 <button
                   className="secondary-button"
                   onClick={() => handleStartClientPayment(selectedClient.id)}
@@ -700,13 +760,55 @@ function ClientDetailView({
           )}
         </article>
 
-        {showAddConceptForm ? (
-          <form className="panel form-panel" onSubmit={(e) => {
-            handleAddConcept(e);
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Actividad</p>
+              <h2>Ultimos movimientos del cliente</h2>
+            </div>
+          </div>
+
+          <div className="movement-list compact-history-list">
+            {recentMovements.length > 0 && (
+              <div className="movement-list-head" aria-hidden="true">
+                <span>Nombre y apellido</span>
+                <span>Importe</span>
+                <span>Medio de pago</span>
+              </div>
+            )}
+            {recentMovements.map((movement) => (
+              <button
+                className="movement-row compact-movement-row movement-button movement-record-row"
+                key={`${movement.movementType}-${movement.id}`}
+                onClick={() => setSelectedMovementId(`${movement.movementType}-${movement.id}`)}
+                type="button"
+              >
+                <div>
+                  <strong>{selectedClient.name}</strong>
+                  <span>
+                    {movement.date} - {movement.concept}
+                  </span>
+                </div>
+                <strong>{formatCurrency(movement.amount)}</strong>
+                <span className="payment-method-cell">{getMovementPaymentMethod(movement)}</span>
+              </button>
+            ))}
+            {recentMovements.length === 0 && <p className="empty-state">Este cliente todavia no tiene movimientos.</p>}
+          </div>
+        </article>
+      </section>
+
+      {showAddConceptForm && (
+        <form
+          className="panel form-panel full-panel"
+          onSubmit={(event) => {
+            handleAddConcept(event);
             handleCloseAddConceptForm();
-          }}>
-            <p className="eyebrow">Nuevo concepto</p>
-            <h2>Agregar importe recurrente</h2>
+          }}
+        >
+          <p className="eyebrow">Nuevo concepto</p>
+          <h2>Agregar importe recurrente</h2>
+          <div className="form-grid">
             <label className="field">
               Concepto
               <input
@@ -725,50 +827,29 @@ function ClientDetailView({
                 value={conceptForm.amount}
               />
             </label>
-            <label className="field">
-              Dia de vencimiento
-              <input
-                max="31"
-                min="1"
-                onChange={(event) => setConceptForm({ ...conceptForm, dueDay: event.target.value })}
-                type="number"
-                value={conceptForm.dueDay}
-              />
-            </label>
-            <div className="button-row">
-              <button className="primary-button" type="submit">
-                <Save size={18} />
-                Guardar concepto
-              </button>
-              <button 
-                className="ghost-button" 
-                onClick={handleCloseAddConceptForm} 
-                type="button"
-              >
-                <X size={18} />
-                Cancelar
-              </button>
-            </div>
-          </form>
-        ) : (
-          <article className="panel action-panel">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Nuevo concepto</p>
-                <h2>Agregar importe recurrente</h2>
-              </div>
-            </div>
-            <button 
-              className="primary-button full-width-button"
-              onClick={() => setShowAddConceptForm(true)}
-              type="button"
-            >
-              <Plus size={18} />
-              Agregar concepto recurrente
+          </div>
+          <label className="field">
+            Dia de vencimiento
+            <input
+              max="31"
+              min="1"
+              onChange={(event) => setConceptForm({ ...conceptForm, dueDay: event.target.value })}
+              type="number"
+              value={conceptForm.dueDay}
+            />
+          </label>
+          <div className="button-row">
+            <button className="primary-button" type="submit">
+              <Save size={18} />
+              Guardar concepto
             </button>
-          </article>
-        )}
-      </section>
+            <button className="ghost-button" onClick={handleCloseAddConceptForm} type="button">
+              <X size={18} />
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
 
       <section className="panel full-panel">
         <div className="panel-header">
@@ -779,37 +860,82 @@ function ClientDetailView({
         </div>
 
         <div className="table-list">
+          {selectedClient.defaultConcepts.length > 0 && (
+            <div className="concept-table-head" aria-hidden="true">
+              <span>Concepto</span>
+              <span>Valor</span>
+              <span>Fecha de vencimiento</span>
+              <span>Estado</span>
+              <span>Acciones</span>
+            </div>
+          )}
           {selectedClient.defaultConcepts.map((item) => (
-            <div className="table-row concept-detail-row" key={item.id}>
-              <input
-                aria-label={`Concepto ${item.concept}`}
-                onBlur={() => handleUpdateConcept(item.id, { concept: item.concept })}
-                onChange={(event) => handleConceptFieldChange(item.id, 'concept', event.target.value)}
-                value={item.concept}
-              />
-              <input
-                aria-label={`Importe ${item.concept}`}
-                min="0"
-                onBlur={() => handleUpdateConcept(item.id, { amount: Number(item.amount) })}
-                onChange={(event) => handleConceptFieldChange(item.id, 'amount', event.target.value)}
-                type="number"
-                value={item.amount}
-              />
-              <input
-                aria-label={`Vencimiento ${item.concept}`}
-                max="31"
-                min="1"
-                onBlur={() => handleUpdateConcept(item.id, { dueDay: Number(item.dueDay) })}
-                onChange={(event) => handleConceptFieldChange(item.id, 'dueDay', event.target.value)}
-                type="number"
-                value={item.dueDay}
-              />
-              <button className={item.active ? 'status-toggle on' : 'status-toggle'} onClick={() => handleToggleConcept(item.id)} type="button">
-                {item.active ? 'Activo' : 'Inactivo'}
-              </button>
-              <button className="secondary-button" onClick={() => handleCreateCharge(item)} type="button">
-                Generar debito
-              </button>
+            <div
+              className={`table-row concept-detail-row ${editingConceptId === item.id ? 'concept-edit-row' : 'concept-readonly-row'}`}
+              key={item.id}
+            >
+              {editingConceptId === item.id ? (
+                <>
+                  <input
+                    aria-label={`Concepto ${item.concept}`}
+                    onChange={(event) => setConceptDraft((current) => ({ ...current, concept: event.target.value }))}
+                    value={conceptDraft.concept}
+                  />
+                  <input
+                    aria-label={`Importe ${item.concept}`}
+                    min="0"
+                    onChange={(event) => setConceptDraft((current) => ({ ...current, amount: event.target.value }))}
+                    type="number"
+                    value={conceptDraft.amount}
+                  />
+                  <input
+                    aria-label={`Vencimiento ${item.concept}`}
+                    max="31"
+                    min="1"
+                    onChange={(event) => setConceptDraft((current) => ({ ...current, dueDay: event.target.value }))}
+                    type="number"
+                    value={conceptDraft.dueDay}
+                  />
+                  <button
+                    className={conceptDraft.active ? 'status-toggle on' : 'status-toggle'}
+                    onClick={() => setConceptDraft((current) => ({ ...current, active: !current.active }))}
+                    type="button"
+                  >
+                    {conceptDraft.active ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <div className="button-row concept-row-actions">
+                    <button className="primary-button" onClick={() => handleSaveConceptEdit(item.id)} type="button">
+                      <Save size={16} />
+                      Guardar
+                    </button>
+                    <button className="ghost-button" onClick={handleCancelConceptEdit} type="button">
+                      <X size={16} />
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="concept-readonly-field">
+                    <strong>{item.concept}</strong>
+                  </div>
+                  <div className="concept-readonly-field concept-value-field">
+                    <strong>{formatCurrency(item.amount)}</strong>
+                  </div>
+                  <div className="concept-readonly-field concept-value-field">
+                    <strong>Dia {item.dueDay}</strong>
+                  </div>
+                  <button className={item.active ? 'status-toggle on' : 'status-toggle'} disabled type="button">
+                    {item.active ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <div className="button-row concept-row-actions">
+                    <button className="secondary-button" onClick={() => handleStartConceptEdit(item)} type="button">
+                      <Pencil size={16} />
+                      Editar
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
           {selectedClient.defaultConcepts.length === 0 && (
@@ -818,85 +944,77 @@ function ClientDetailView({
         </div>
       </section>
 
-      <section className="panel full-panel">
+      {selectedMovement && (
+        <MovementDetailModal movement={selectedMovement} onClose={() => setSelectedMovementId(null)} />
+      )}
+    </>
+  );
+}
+
+export function MovementDetailModal({ movement, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        aria-labelledby="movement-detail-title"
+        aria-modal="true"
+        className="modal-card panel"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Historial</p>
-            <h2>Cobros discriminados</h2>
+            <p className="eyebrow">Detalle</p>
+            <h2 id="movement-detail-title">Informacion del movimiento</h2>
           </div>
+          <button className="icon-button" onClick={onClose} type="button" aria-label="Cerrar detalle">
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="table-list">
-          {allMovements.map((movement) => (
-            <button
-              className={`table-row payment-row ${selectedPaymentId === movement.id ? 'active' : ''}`}
-              key={`${movement.movementType}-${movement.id}`}
-              onClick={() => setSelectedPaymentId(selectedPaymentId === movement.id ? null : movement.id)}
-              type="button"
-            >
-              <div>
-                <strong>{movement.concept}</strong>
-                <span>{movement.date}</span>
-              </div>
-              <span className={movement.movementType === 'Pago' ? 'badge paid' : 'badge'}>
-                {movement.movementType}
-              </span>
-              <strong>{formatCurrency(movement.amount)}</strong>
-              <ChevronRight size={18} className="row-indicator" />
-            </button>
-          ))}
-          {allMovements.length === 0 && <p className="empty-state">Este cliente todavia no tiene movimientos.</p>}
-        </div>
-
-        {selectedPayment && (
-          <div className="detail-panel-inline">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Detalle</p>
-                <h2>Información del movimiento</h2>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setSelectedPaymentId(null)}
-                type="button"
-                aria-label="Cerrar detalle"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="detail-content">
-              <div className="detail-row">
-                <span className="detail-label">Concepto</span>
-                <strong className="detail-value">{selectedPayment.concept}</strong>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Fecha</span>
-                <strong className="detail-value">{selectedPayment.date}</strong>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Monto</span>
-                <strong className="detail-value">{formatCurrency(selectedPayment.amount)}</strong>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Tipo</span>
-                <strong className="detail-value">{selectedPayment.movementType}</strong>
-              </div>
-              {selectedPayment.method && (
-                <div className="detail-row">
-                  <span className="detail-label">Medio de pago</span>
-                  <strong className="detail-value">{selectedPayment.method}</strong>
-                </div>
-              )}
-              {selectedPayment.receipt && (
-                <div className="detail-row">
-                  <span className="detail-label">Comprobante</span>
-                  <strong className="detail-value">{selectedPayment.receipt}</strong>
-                </div>
-              )}
-            </div>
+        <div className="detail-content">
+          <div className="detail-row">
+            <span className="detail-label">Concepto</span>
+            <strong className="detail-value">{movement.concept}</strong>
           </div>
-        )}
-      </section>
-    </>
+          <div className="detail-row">
+            <span className="detail-label">Fecha</span>
+            <strong className="detail-value">{movement.date}</strong>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">Monto</span>
+            <strong className="detail-value">{formatCurrency(movement.amount)}</strong>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">Tipo</span>
+            <strong className="detail-value">{movement.movementType}</strong>
+          </div>
+          {Array.isArray(movement.concepts) && movement.concepts.length > 0 && (
+            <div className="detail-row detail-row-stack">
+              <span className="detail-label">Conceptos imputados</span>
+              <div className="detail-breakdown">
+                {movement.concepts.map((item, index) => (
+                  <div className="detail-breakdown-item" key={`${item.concept}-${index}`}>
+                    <span>{item.concept}</span>
+                    <strong>{formatCurrency(item.amount)}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {movement.method && (
+            <div className="detail-row">
+              <span className="detail-label">Medio de pago</span>
+              <strong className="detail-value">{movement.method}</strong>
+            </div>
+          )}
+          {movement.receipt && (
+            <div className="detail-row">
+              <span className="detail-label">Comprobante</span>
+              <strong className="detail-value">{movement.receipt}</strong>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
