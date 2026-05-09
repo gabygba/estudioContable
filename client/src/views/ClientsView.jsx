@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Banknote, FileText, Pencil, Plus, Printer, Save, Trash2, X } from 'lucide-react';
 import { PaymentsView } from './PaymentsView.jsx';
 import { formatCurrency, getClientName, getMovementPaymentMethod } from '../utils/formatters.js';
@@ -588,6 +588,14 @@ function ClientDetailView({
 }) {
   const isEditingClient = editingClientId === selectedClient.id;
   const [showAddConceptForm, setShowAddConceptForm] = useState(false);
+  const addConceptRef = useRef(null);
+
+  useEffect(() => {
+    if (showAddConceptForm && addConceptRef.current) {
+      // Smooth scroll to the add-concept form when it becomes visible
+      addConceptRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [showAddConceptForm]);
   const [selectedMovementId, setSelectedMovementId] = useState(null);
   const [editingConceptId, setEditingConceptId] = useState(null);
   const [conceptDraft, setConceptDraft] = useState({ concept: '', amount: '', dueDay: '', active: true });
@@ -800,6 +808,7 @@ function ClientDetailView({
 
       {showAddConceptForm && (
         <form
+          ref={addConceptRef}
           className="panel form-panel full-panel"
           onSubmit={(event) => {
             handleAddConcept(event);
