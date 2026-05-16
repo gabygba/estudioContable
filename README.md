@@ -34,8 +34,9 @@ server/               Express API
 - ABM de clientes con alta, modificacion y baja.
 - Gestion de conceptos/importes por defecto por cliente.
 - Generacion manual de debitos desde conceptos recurrentes.
-- Registro de pagos discriminados por cliente, concepto y medio de pago.
-- Reporte imprimible por cliente con debitos, creditos y saldo.
+- Registro de pagos desde el detalle de cada cliente, discriminado por concepto y medio de pago.
+- Reportes desde Clientes con filtros por clientes, fechas, conceptos y tipo de movimiento.
+- Salida de reporte como listado en pantalla o vista imprimible.
 - ABM de empleados con alta, modificacion y baja.
 - Liquidacion de sueldos e historial de cobro.
 - Calculo de variable sugerido sobre honorarios cobrados.
@@ -67,7 +68,7 @@ Si se necesita apuntar a otra URL, se puede definir `VITE_API_URL` en el entorno
 - `POST /api/charges`
 - `GET /api/payments`
 - `POST /api/payments`
-- `GET /api/reports/client/:clientId`
+- `GET /api/reports/movements`
 - `GET /api/employees`
 - `GET /api/employees/:employeeId`
 - `POST /api/employees`

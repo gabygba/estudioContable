@@ -61,6 +61,7 @@ let payments = [
     date: '2026-04-16',
     concept: 'Honorarios',
     amount: 62000,
+    concepts: [{ conceptId: 4, concept: 'Honorarios', amount: 62000 }],
     method: 'Transferencia',
     receipt: 'TR-1024',
   },
@@ -70,6 +71,7 @@ let payments = [
     date: '2026-04-18',
     concept: 'Pago de IVA',
     amount: 76000,
+    concepts: [{ conceptId: 2, concept: 'Pago de IVA', amount: 76000 }],
     method: 'Efectivo',
     receipt: 'RC-0041',
   },
@@ -116,6 +118,33 @@ function createId(collection) {
 function createConceptId() {
   const concepts = clients.flatMap((client) => client.defaultConcepts);
   return createId(concepts);
+}
+
+function normalizePaymentConcepts(payment) {
+  if (Array.isArray(payment.concepts) && payment.concepts.length > 0) {
+    return payment.concepts.map((concept) => ({
+      conceptId: concept.conceptId === undefined ? undefined : Number(concept.conceptId),
+      concept: concept.concept,
+      amount: Number(concept.amount),
+    }));
+  }
+
+  if (payment.concept) {
+    return [
+      {
+        concept: payment.concept,
+        amount: Number(payment.amount),
+      },
+    ];
+  }
+
+  return [];
+}
+
+function buildPaymentConceptLabel(concepts) {
+  if (concepts.length === 0) return 'Pago sin concepto';
+  if (concepts.length === 1) return concepts[0].concept;
+  return `${concepts[0].concept} + ${concepts.length - 1} mas`;
 }
 
 function getDashboard() {
@@ -298,12 +327,17 @@ app.get('/api/payments', (_req, res) => {
 });
 
 app.post('/api/payments', (req, res) => {
+  const concepts = normalizePaymentConcepts(req.body).filter(
+    (concept) => concept.concept && Number(concept.amount) > 0,
+  );
+
   const payment = {
     id: createId(payments),
     clientId: Number(req.body.clientId),
     date: req.body.date,
-    concept: req.body.concept,
-    amount: Number(req.body.amount),
+    concept: buildPaymentConceptLabel(concepts),
+    amount: concepts.reduce((total, concept) => total + Number(concept.amount), 0),
+    concepts,
     method: req.body.method,
     receipt: req.body.receipt ?? '',
   };
@@ -334,6 +368,86 @@ app.get('/api/reports/client/:clientId', (req, res) => {
     client,
     rows,
     balance: rows.reduce((total, row) => total + row.debit - row.credit, 0),
+  });
+});
+
+app.get('/api/reports/movements', (req, res) => {
+  const clientIds = req.query.clientIds
+    ? String(req.query.clientIds)
+        .split(',')
+        .map(Number)
+        .filter(Boolean)
+    : [];
+  const concepts = req.query.concepts
+    ? String(req.query.concepts)
+        .split(',')
+        .map((concept) => concept.trim())
+        .filter(Boolean)
+    : [];
+  const movementTypes = req.query.movementTypes
+    ? String(req.query.movementTypes)
+        .split(',')
+        .map((type) => type.trim())
+        .filter(Boolean)
+    : ['Debito', 'Pago'];
+  const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : '';
+  const dateTo = req.query.dateTo ? String(req.query.dateTo) : '';
+
+  const rows = [
+    ...charges.map((charge) => ({
+      id: charge.id,
+      clientId: charge.clientId,
+      clientName: clients.find((client) => client.id === charge.clientId)?.name ?? 'Sin cliente',
+      date: charge.date,
+      concept: charge.concept,
+      type: 'Debito',
+      debit: charge.amount,
+      credit: 0,
+    })),
+    ...payments.map((payment) => ({
+      id: payment.id,
+      clientId: payment.clientId,
+      clientName: clients.find((client) => client.id === payment.clientId)?.name ?? 'Sin cliente',
+      date: payment.date,
+      concept: payment.concept,
+      type: 'Pago',
+      debit: 0,
+      credit: payment.amount,
+      concepts: normalizePaymentConcepts(payment),
+      method: payment.method,
+      receipt: payment.receipt,
+    })),
+  ]
+    .filter((row) => clientIds.length === 0 || clientIds.includes(row.clientId))
+    .filter((row) => {
+      if (concepts.length === 0) return true;
+      if (row.type === 'Debito') return concepts.includes(row.concept);
+      return row.concepts?.some((concept) => concepts.includes(concept.concept));
+    })
+    .filter((row) => movementTypes.includes(row.type))
+    .filter((row) => !dateFrom || row.date >= dateFrom)
+    .filter((row) => !dateTo || row.date <= dateTo)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.clientName.localeCompare(b.clientName));
+
+  const totals = rows.reduce(
+    (accumulator, row) => ({
+      debit: accumulator.debit + row.debit,
+      credit: accumulator.credit + row.credit,
+      balance: accumulator.balance + row.debit - row.credit,
+    }),
+    { debit: 0, credit: 0, balance: 0 },
+  );
+
+  res.json({
+    filters: {
+      clientIds,
+      concepts,
+      dateFrom,
+      dateTo,
+      movementTypes,
+    },
+    rows,
+    totals,
   });
 });
 
