@@ -4,7 +4,59 @@ import { PaymentsView } from './PaymentsView.jsx';
 import { formatCurrency, getClientName, getMovementPaymentMethod, getMovementPaymentMethodTone } from '../utils/formatters.js';
 import { MetricCard } from '../components/MetricCard.jsx';
 
-const PREVIEW_ITEM_COUNT = 3;
+export function useOverflowToggle(isExpanded, dependencies = []) {
+  const [canToggle, setCanToggle] = useState(false);
+  const listRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return undefined;
+
+    const updateOverflowState = () => {
+      if (isExpanded) return;
+      setCanToggle(list.scrollHeight > list.clientHeight + 1);
+    };
+
+    updateOverflowState();
+    window.addEventListener('resize', updateOverflowState);
+
+    if (typeof ResizeObserver === 'undefined') {
+      return () => window.removeEventListener('resize', updateOverflowState);
+    }
+
+    const observer = new ResizeObserver(updateOverflowState);
+    observer.observe(list);
+
+    return () => {
+      window.removeEventListener('resize', updateOverflowState);
+      observer.disconnect();
+    };
+  }, [isExpanded, ...dependencies]);
+
+  return { canToggle, listRef };
+}
+
+export function useAvailableViewportHeight(dependencies = []) {
+  const [availableHeight, setAvailableHeight] = useState(null);
+  const panelRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return undefined;
+
+    const updateAvailableHeight = () => {
+      const { top } = panel.getBoundingClientRect();
+      setAvailableHeight(Math.max(220, window.innerHeight - top - 32));
+    };
+
+    updateAvailableHeight();
+    window.addEventListener('resize', updateAvailableHeight);
+
+    return () => window.removeEventListener('resize', updateAvailableHeight);
+  }, dependencies);
+
+  return { availableHeight, panelRef };
+}
 
 function getClientBalance(clientId, charges, payments) {
   const charged = charges
@@ -145,35 +197,25 @@ function ClientsListView({
 }) {
   const latestMovements = getLatestMovements(charges, payments);
   const [selectedMovementId, setSelectedMovementId] = useState(null);
+  const [isClientsCollapsed, setIsClientsCollapsed] = useState(true);
   const [isActivityCollapsed, setIsActivityCollapsed] = useState(true);
-  const [clientHomePanelHeight, setClientHomePanelHeight] = useState(null);
-  const clientsPanelRef = useRef(null);
-  const visibleClients = clients.slice(0, PREVIEW_ITEM_COUNT);
-  const visibleLatestMovements = isActivityCollapsed ? latestMovements.slice(0, PREVIEW_ITEM_COUNT) : latestMovements;
-  const canToggleActivity = latestMovements.length > PREVIEW_ITEM_COUNT;
+  const { availableHeight: clientsPanelHeight, panelRef: clientsPanelRef } = useAvailableViewportHeight([
+    clients.length,
+  ]);
+  const { availableHeight: clientHomePanelHeight, panelRef: activityPanelRef } = useAvailableViewportHeight([
+    latestMovements.length,
+  ]);
+  const { canToggle: canToggleClients, listRef: clientsListRef } = useOverflowToggle(!isClientsCollapsed, [
+    clients.length,
+    clientsPanelHeight,
+  ]);
+  const { canToggle: canToggleActivity, listRef: activityListRef } = useOverflowToggle(!isActivityCollapsed, [
+    latestMovements.length,
+    clientHomePanelHeight,
+  ]);
   const selectedMovement = selectedMovementId
     ? latestMovements.find((movement) => `${movement.movementType}-${movement.id}` === selectedMovementId)
     : null;
-
-  useLayoutEffect(() => {
-    const panel = clientsPanelRef.current;
-    if (!panel) return undefined;
-
-    const updatePanelHeight = () => {
-      setClientHomePanelHeight(panel.offsetHeight);
-    };
-
-    updatePanelHeight();
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', updatePanelHeight);
-      return () => window.removeEventListener('resize', updatePanelHeight);
-    }
-
-    const observer = new ResizeObserver(updatePanelHeight);
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, [visibleClients.length]);
 
   return (
     <>
@@ -213,9 +255,15 @@ function ClientsListView({
 
       <section
         className="content-grid client-home-grid"
-        style={clientHomePanelHeight ? { '--client-home-panel-height': `${clientHomePanelHeight}px` } : undefined}
+        style={{
+          ...(clientsPanelHeight ? { '--clients-panel-height': `${clientsPanelHeight}px` } : {}),
+          ...(clientHomePanelHeight ? { '--client-home-panel-height': `${clientHomePanelHeight}px` } : {}),
+        }}
       >
-        <article className="panel wide-panel clients-list-panel" ref={clientsPanelRef}>
+        <article
+          className={`panel wide-panel clients-list-panel ${isClientsCollapsed ? '' : 'is-expanded'}`}
+          ref={clientsPanelRef}
+        >
           <div className="panel-header">
             <div>
               <p className="eyebrow">Listado</p>
@@ -224,8 +272,8 @@ function ClientsListView({
           </div>
 
           <div className="table-list clients-scroll-list-container">
-            <div className="clients-scroll-list">
-              {visibleClients.map((client) => (
+            <div className="clients-scroll-list" ref={clientsListRef}>
+              {clients.map((client) => (
                 <div className="table-row client-list-row" key={client.id}>
                   <button className="client-select-button" onClick={() => handleSelectClient(client.id)} type="button">
                     <div>
@@ -251,10 +299,19 @@ function ClientsListView({
               ))}
               {clients.length === 0 && <p className="empty-state">Todavia no hay clientes cargados.</p>}
             </div>
+            {canToggleClients && (
+              <button
+                className="secondary-button compact-button clients-toggle-button"
+                onClick={() => setIsClientsCollapsed((currentValue) => !currentValue)}
+                type="button"
+              >
+                {isClientsCollapsed ? 'Mostrar mas' : 'Mostrar menos'}
+              </button>
+            )}
           </div>
         </article>
 
-        <article className={`panel clients-activity-panel ${isActivityCollapsed ? '' : 'is-expanded'}`}>
+        <article className={`panel clients-activity-panel ${isActivityCollapsed ? '' : 'is-expanded'}`} ref={activityPanelRef}>
           <div className="panel-header">
             <div>
               <p className="eyebrow">Actividad</p>
@@ -263,7 +320,7 @@ function ClientsListView({
           </div>
 
           <div className="movement-list clients-scroll-list-container">
-            <div className="movement-list clients-scroll-list">
+            <div className="movement-list clients-scroll-list" ref={activityListRef}>
               {latestMovements.length > 0 && (
                 <div className="movement-list-head client-home-movement-head" aria-hidden="true">
                   <span>Nombre y apellido</span>
@@ -271,7 +328,7 @@ function ClientsListView({
                   <span>Importe</span>
                 </div>
               )}
-              {visibleLatestMovements.map((movement) => (
+              {latestMovements.map((movement) => (
                 <button
                   className="movement-row compact-movement-row movement-button movement-record-row client-home-movement-row"
                   key={`${movement.movementType}-${movement.id}`}
@@ -295,7 +352,7 @@ function ClientsListView({
                 onClick={() => setIsActivityCollapsed((currentValue) => !currentValue)}
                 type="button"
               >
-                {isActivityCollapsed ? 'Mostrar más' : 'Mostrar menos'}
+                {isActivityCollapsed ? 'Mostrar mas' : 'Mostrar menos'}
               </button>
             )}
           </div>
@@ -651,8 +708,9 @@ function ClientDetailView({
   const [showAddConceptForm, setShowAddConceptForm] = useState(false);
   const addConceptRef = useRef(null);
   const [isActivityCollapsed, setIsActivityCollapsed] = useState(true);
-  const [clientDetailPanelHeight, setClientDetailPanelHeight] = useState(null);
-  const detailPanelRef = useRef(null);
+  const { availableHeight: clientDetailPanelHeight, panelRef: detailActivityPanelRef } = useAvailableViewportHeight([
+    selectedClient.id,
+  ]);
 
   useEffect(() => {
     if (showAddConceptForm && addConceptRef.current) {
@@ -670,32 +728,15 @@ function ClientDetailView({
     ...clientCharges.map((charge) => ({ ...charge, movementType: 'Debito' })),
     ...clientPayments.map((payment) => ({ ...payment, movementType: 'Pago' })),
   ].sort((a, b) => b.date.localeCompare(a.date));
-  const recentMovements = isActivityCollapsed ? allMovements.slice(0, PREVIEW_ITEM_COUNT) : allMovements;
-  const canToggleActivity = allMovements.length > 0;
+  const { canToggle: canToggleActivity, listRef: detailActivityListRef } = useOverflowToggle(!isActivityCollapsed, [
+    allMovements.length,
+    clientDetailPanelHeight,
+    selectedClient.id,
+  ]);
 
   const selectedMovement = selectedMovementId
     ? allMovements.find((movement) => `${movement.movementType}-${movement.id}` === selectedMovementId)
     : null;
-
-  useLayoutEffect(() => {
-    const panel = detailPanelRef.current;
-    if (!panel) return undefined;
-
-    const updatePanelHeight = () => {
-      setClientDetailPanelHeight(panel.offsetHeight);
-    };
-
-    updatePanelHeight();
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', updatePanelHeight);
-      return () => window.removeEventListener('resize', updatePanelHeight);
-    }
-
-    const observer = new ResizeObserver(updatePanelHeight);
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, [isEditingClient, selectedClient.id]);
 
   function handleCloseAddConceptForm() {
     setShowAddConceptForm(false);
@@ -767,7 +808,7 @@ function ClientDetailView({
         className="content-grid client-detail-grid"
         style={clientDetailPanelHeight ? { '--client-detail-panel-height': `${clientDetailPanelHeight}px` } : undefined}
       >
-        <article className="panel wide-panel client-detail-panel" ref={detailPanelRef}>
+        <article className="panel wide-panel client-detail-panel">
           <div className="panel-header">
             <div>
               <p className="eyebrow">Detalle</p>
@@ -875,7 +916,10 @@ function ClientDetailView({
 
         </article>
 
-        <article className={`panel clients-activity-panel client-detail-activity-panel ${isActivityCollapsed ? '' : 'is-expanded'}`}>
+        <article
+          className={`panel clients-activity-panel client-detail-activity-panel ${isActivityCollapsed ? '' : 'is-expanded'}`}
+          ref={detailActivityPanelRef}
+        >
           <div className="panel-header">
             <div>
               <p className="eyebrow">Actividad</p>
@@ -884,7 +928,7 @@ function ClientDetailView({
           </div>
 
           <div className="movement-list clients-scroll-list-container">
-            <div className="movement-list clients-scroll-list">
+            <div className="movement-list clients-scroll-list" ref={detailActivityListRef}>
             {allMovements.length > 0 && (
               <div className="movement-list-head client-detail-movement-head" aria-hidden="true">
                 <span>Fecha</span>
@@ -892,7 +936,7 @@ function ClientDetailView({
                 <span>Medio de pago</span>
               </div>
             )}
-            {recentMovements.map((movement) => (
+            {allMovements.map((movement) => (
               <button
                 className="movement-row compact-movement-row movement-button movement-record-row client-detail-movement-row"
                 key={`${movement.movementType}-${movement.id}`}
@@ -916,7 +960,7 @@ function ClientDetailView({
                 onClick={() => setIsActivityCollapsed((currentValue) => !currentValue)}
                 type="button"
               >
-                {isActivityCollapsed ? 'Mostrar más' : 'Mostrar menos'}
+                {isActivityCollapsed ? 'Mostrar mas' : 'Mostrar menos'}
               </button>
             )}
           </div>
