@@ -3,7 +3,8 @@ import cors from 'cors';
 import express from 'express';
 
 const app = express();
-const port = process.env.PORT ?? 3001;
+const port = Number(process.env.PORT ?? 3001);
+const host = process.env.HOST ?? 'localhost';
 
 app.use(cors());
 app.use(express.json());
@@ -545,6 +546,23 @@ app.post('/api/salaries', (req, res) => {
   res.status(201).json(salary);
 });
 
-app.listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
+const server = app.listen(port, host, () => {
+  console.log(`API listening on http://${host}:${port}`);
+});
+
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use.`);
+    console.error(`Stop the process using it or set a different PORT in server/.env.`);
+    console.error(`On macOS/Linux you can check it with: lsof -i :${port}`);
+    process.exit(1);
+  }
+
+  if (error.code === 'EPERM') {
+    console.error(`The API could not listen on http://${host}:${port}.`);
+    console.error(`Check OS permissions or try a different PORT in server/.env.`);
+    process.exit(1);
+  }
+
+  throw error;
 });

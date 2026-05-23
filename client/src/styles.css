@@ -520,6 +520,10 @@ h2 {
   min-height: 0;
 }
 
+.home-movements-panel .movement-record-row + .movement-record-row {
+  margin-top: 0.5rem;
+}
+
 .home-movements-panel.is-expanded .clients-scroll-list {
   overflow: visible;
 }
